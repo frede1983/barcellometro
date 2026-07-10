@@ -28,7 +28,16 @@ class TikTokSource {
   }
 
   async start() {
-    const options = { fetchRoomInfoOnConnect: true, enableExtendedGiftInfo: true };
+    // Configurazione allineata a TokScope (setup anonimo che funziona da IP residenziale):
+    // enableExtendedGiftInfo solo con sessionId (altrimenti 403 sul catalogo regali).
+    const sessionId = this.opts.sessionId || undefined;
+    const options = {
+      processInitialData: true,
+      fetchRoomInfoOnConnect: true,
+      requestPollingIntervalMs: 2000,
+      enableExtendedGiftInfo: Boolean(sessionId),
+      ...(sessionId ? { sessionId } : {}),
+    };
     if (this.opts.signApiKey) options.signApiKey = this.opts.signApiKey;
     this.connection = new TikTokLiveConnection(this.username, options);
 

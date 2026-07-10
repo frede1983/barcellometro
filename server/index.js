@@ -451,6 +451,7 @@ async function addTikTok(username, matchOpts = {}) {
   const cb = makeCallbacks(() => sources.get(id));
   src.impl = new TikTokSource(username, {
     signApiKey: cfg.get('TIKTOK_SIGN_API_KEY') || undefined,
+    sessionId: cfg.get('TIKTOK_SESSION_ID') || undefined,
     audioEnabled: cfg.get('AUDIO_ENABLED'),
     chunkSec: cfg.get('AUDIO_CHUNK_SEC'),
     audioLang: cfg.get('AUDIO_LANG') || 'it',

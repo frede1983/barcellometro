@@ -438,7 +438,10 @@
     </div>
 
     <h3>🎵 TikTok</h3>
-    <div class="frow"><label>API key Euler Stream</label><input id="s_TIKTOK_SIGN_API_KEY" type="password" placeholder=""></div>
+    <div class="hintrow">La firma della connessione TikTok è concessa gratis dagli IP <b>residenziali</b> (PC di casa). Dai <b>IP datacenter</b> (VPS) Euler può richiedere un piano a pagamento o una chiave/sessionId.</div>
+    <div class="frow"><label>API key Euler Stream</label><input id="s_TIKTOK_SIGN_API_KEY" type="password" placeholder="opzionale"></div>
+    <div class="frow"><label>Session ID TikTok</label><input id="s_TIKTOK_SESSION_ID" type="password" placeholder="cookie sessionid (opzionale)"></div>
+    <div class="hintrow">Session ID: login su tiktok.com → DevTools → Application → Cookies → <b>sessionid</b>. Sblocca live ristrette e riduce i rate-limit.</div>
 
     <h3>🌍 Lingue</h3>
     <div class="frow"><label>Rilevamento (csv: it,en,es)</label><input id="s_DETECT_LANGS" placeholder="it,en,es"></div>
@@ -1092,7 +1095,7 @@ if (window.Notification && Notification.permission === 'default') {
 }
 
 // ---------- Impostazioni ----------
-const SETTING_FIELDS = ['AI_PROVIDER','AI_MODEL','ANTHROPIC_API_KEY','AI_TRIGGER_SCORE','AI_COOLDOWN_SEC','DISCORD_BOT_TOKEN','TTS_VOICE','TIKTOK_SIGN_API_KEY','DETECT_LANGS','AUDIO_LANG','TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID','HA_URL','HA_TOKEN','HA_MEDIA_PLAYER','HA_TTS_ENTITY','NOTIFY_ON_ALERT','NOTIFY_ON_MODERATION','NOTIFY_ON_CROSSHOST','CLIPS_ENABLED','AUDIO_ENABLED','WHISPER_MODEL','AUDIO_CHUNK_SEC','WATCHER_INTERVAL_SEC','WATCHER_COOLDOWN_SEC','INTERVENTION_COOLDOWN_SEC','ALERT_THRESHOLD','DASH_PASSWORD','PORT'];
+const SETTING_FIELDS = ['AI_PROVIDER','AI_MODEL','ANTHROPIC_API_KEY','AI_TRIGGER_SCORE','AI_COOLDOWN_SEC','DISCORD_BOT_TOKEN','TTS_VOICE','TIKTOK_SIGN_API_KEY','TIKTOK_SESSION_ID','DETECT_LANGS','AUDIO_LANG','TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID','HA_URL','HA_TOKEN','HA_MEDIA_PLAYER','HA_TTS_ENTITY','NOTIFY_ON_ALERT','NOTIFY_ON_MODERATION','NOTIFY_ON_CROSSHOST','CLIPS_ENABLED','AUDIO_ENABLED','WHISPER_MODEL','AUDIO_CHUNK_SEC','WATCHER_INTERVAL_SEC','WATCHER_COOLDOWN_SEC','INTERVENTION_COOLDOWN_SEC','ALERT_THRESHOLD','DASH_PASSWORD','PORT'];
 
 async function openSettings() {
   $('sErr').textContent = ''; $('sOk').textContent = ''; $('aiTestOut').textContent = '';

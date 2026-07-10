@@ -4,6 +4,13 @@ Tutte le modifiche rilevanti del progetto sono documentate in questo file.
 Formato basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/),
 versionamento [SemVer](https://semver.org/lang/it/).
 
+## [1.3.1] - 2026-07-11
+
+### Corretto / Migliorato
+- Connessione TikTok allineata al setup anonimo funzionante (rif. TokScope): `processInitialData`, `requestPollingIntervalMs`, `enableExtendedGiftInfo` attivo solo con sessionId, versione connector fissata a 2.1.0
+- Supporto **Session ID TikTok** (cookie `sessionid`) configurabile dalla UI: sblocca live ristrette e riduce i rate-limit
+- Nota importante: la firma anonima Euler è concessa dagli **IP residenziali**; dagli **IP datacenter (VPS)** può servire chiave/sessionId o piano a pagamento (causa dell'errore "Business plan"). Per il TikTok conviene eseguire dal PC di casa.
+
 ## [1.3.0] - 2026-07-11
 
 🚧 Work in Progress. Completata la roadmap principale.
