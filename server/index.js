@@ -46,25 +46,36 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({
-  server,
-  path: '/ws',
-  verifyClient: (info) => checkAuth(info.req.headers.authorization),
+
+// Due WebSocket server sullo stesso HTTP server: routing manuale dell'upgrade
+// per evitare il conflitto tra istanze con path diversi.
+const wss = new WebSocketServer({ noServer: true });
+const bridgeWss = new WebSocketServer({ noServer: true });
+const hub = new BridgeHub();
+
+function bridgeTokenOk(req) {
+  const token = cfg.get('BRIDGE_TOKEN');
+  if (!token) return false;
+  const url = new URL(req.url, 'http://x');
+  const provided = url.searchParams.get('token') || (req.headers['authorization'] || '').replace(/^Bearer /, '');
+  return provided === token;
+}
+
+server.on('upgrade', (req, socket, head) => {
+  let pathname;
+  try { pathname = new URL(req.url, 'http://x').pathname; } catch { socket.destroy(); return; }
+
+  if (pathname === '/ws') {
+    if (!checkAuth(req.headers.authorization)) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return; }
+    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+  } else if (pathname === '/bridge') {
+    if (!bridgeTokenOk(req)) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return; }
+    bridgeWss.handleUpgrade(req, socket, head, (ws) => bridgeWss.emit('connection', ws, req));
+  } else {
+    socket.destroy();
+  }
 });
 
-// Bridge Hub: WebSocket dedicata per lo script locale (auth a token, non Basic Auth)
-const hub = new BridgeHub();
-const bridgeWss = new WebSocketServer({
-  server,
-  path: '/bridge',
-  verifyClient: (info) => {
-    const token = cfg.get('BRIDGE_TOKEN');
-    if (!token) return false; // bridge disabilitato finché non c'è un token
-    const url = new URL(info.req.url, 'http://x');
-    const provided = url.searchParams.get('token') || (info.req.headers['authorization'] || '').replace(/^Bearer /, '');
-    return provided === token;
-  },
-});
 bridgeWss.on('connection', (ws) => {
   hub.attach(ws, () => broadcast('bridge', { status: hub.status() }));
   try { ws.send(JSON.stringify({ t: 'ping' })); } catch { /* ignore */ }
