@@ -20,6 +20,8 @@ const { setLangs } = require('./keywords');
 const { AIClassifier } = require('./ai');
 const { WhisperClient } = require('./audio/whisperClient');
 const { TikTokSource } = require('./sources/tiktok');
+const { RemoteTikTokSource } = require('./sources/remoteTiktok');
+const { BridgeHub } = require('./bridgeHub');
 const { initDiscord, shutdownDiscord, isDiscordReady, listGuilds, DiscordSource } = require('./sources/discordSource');
 
 const PORT = cfg.get('PORT');
@@ -48,6 +50,24 @@ const wss = new WebSocketServer({
   server,
   path: '/ws',
   verifyClient: (info) => checkAuth(info.req.headers.authorization),
+});
+
+// Bridge Hub: WebSocket dedicata per lo script locale (auth a token, non Basic Auth)
+const hub = new BridgeHub();
+const bridgeWss = new WebSocketServer({
+  server,
+  path: '/bridge',
+  verifyClient: (info) => {
+    const token = cfg.get('BRIDGE_TOKEN');
+    if (!token) return false; // bridge disabilitato finché non c'è un token
+    const url = new URL(info.req.url, 'http://x');
+    const provided = url.searchParams.get('token') || (info.req.headers['authorization'] || '').replace(/^Bearer /, '');
+    return provided === token;
+  },
+});
+bridgeWss.on('connection', (ws) => {
+  hub.attach(ws, () => broadcast('bridge', { status: hub.status() }));
+  try { ws.send(JSON.stringify({ t: 'ping' })); } catch { /* ignore */ }
 });
 
 store.setPuttWeights(cfg.get('PUTT_WEIGHTS'));
@@ -98,11 +118,13 @@ function snapshot() {
       startedAt: s.startedAt,
       matchGroup: s.matchGroup || null, matchOpponent: s.matchOpponent || null,
       donationTotal: Math.round(s.donationTotal || 0), donationCount: s.donationCount || 0,
+      viaBridge: Boolean(s.viaBridge),
     })),
     global: globalScore(),
     whisper: { available: whisper.available, model: whisper.model },
     ai: { enabled: ai.enabled, provider: ai.provider, model: ai.enabled ? ai.model : null },
     discordReady: isDiscordReady(),
+    bridge: hub.status(),
     watchers: cfg.get('WATCHERS'),
     interventions: cfg.get('INTERVENTIONS'),
     moderation: { enabled: cfg.get('MODERATION').enabled },
@@ -449,15 +471,29 @@ async function addTikTok(username, matchOpts = {}) {
     linkedTo: matchOpts.linkedTo || null,
   };
   const cb = makeCallbacks(() => sources.get(id));
-  src.impl = new TikTokSource(username, {
-    signApiKey: cfg.get('TIKTOK_SIGN_API_KEY') || undefined,
-    sessionId: cfg.get('TIKTOK_SESSION_ID') || undefined,
-    audioEnabled: cfg.get('AUDIO_ENABLED'),
-    chunkSec: cfg.get('AUDIO_CHUNK_SEC'),
-    audioLang: cfg.get('AUDIO_LANG') || 'it',
-    whisper,
-    ...cb,
-  });
+  // Se il bridge è connesso (o richiesto), il TikTok passa dallo script locale (IP residenziale)
+  const useBridge = hub.connected || cfg.get('BRIDGE_REQUIRED');
+  if (useBridge) {
+    src.viaBridge = true;
+    src.impl = new RemoteTikTokSource(username, {
+      hub,
+      audioEnabled: cfg.get('AUDIO_ENABLED'),
+      chunkSec: cfg.get('AUDIO_CHUNK_SEC'),
+      audioLang: cfg.get('AUDIO_LANG') || 'it',
+      whisper,
+      ...cb,
+    });
+  } else {
+    src.impl = new TikTokSource(username, {
+      signApiKey: cfg.get('TIKTOK_SIGN_API_KEY') || undefined,
+      sessionId: cfg.get('TIKTOK_SESSION_ID') || undefined,
+      audioEnabled: cfg.get('AUDIO_ENABLED'),
+      chunkSec: cfg.get('AUDIO_CHUNK_SEC'),
+      audioLang: cfg.get('AUDIO_LANG') || 'it',
+      whisper,
+      ...cb,
+    });
+  }
   sources.set(id, src);
   try {
     await src.impl.start();
@@ -762,6 +798,9 @@ app.get('/api/donations', (req, res) => {
   const totale = perSource.reduce((a, s) => a + s.donationTotal, 0);
   res.json({ perSource, totale });
 });
+
+// ---------- API bridge ----------
+app.get('/api/bridge', (req, res) => res.json(hub.status()));
 
 // ---------- API storico + replay ----------
 app.get('/api/history', (req, res) => {

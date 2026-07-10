@@ -22,6 +22,9 @@ const DEFAULTS = {
   DISCORD_BOT_TOKEN: '',
   TIKTOK_SIGN_API_KEY: '',
   TIKTOK_SESSION_ID: '',
+  // Bridge: quando presente, il TikTok viene gestito dallo script locale (IP residenziale)
+  BRIDGE_TOKEN: '',
+  BRIDGE_REQUIRED: false, // se true, le nuove sorgenti TikTok usano SOLO il bridge
   AUDIO_ENABLED: true,
   AUDIO_CHUNK_SEC: 8,
   WHISPER_MODEL: 'small',
@@ -75,7 +78,7 @@ const DEFAULTS = {
 // Chiavi il cui nuovo valore richiede riavvio del server
 const RESTART_KEYS = ['PORT'];
 // Chiavi segrete: mai inviate in chiaro alla UI
-const SECRET_KEYS = ['DASH_PASSWORD', 'ANTHROPIC_API_KEY', 'DISCORD_BOT_TOKEN', 'TIKTOK_SIGN_API_KEY', 'TIKTOK_SESSION_ID'];
+const SECRET_KEYS = ['DASH_PASSWORD', 'ANTHROPIC_API_KEY', 'DISCORD_BOT_TOKEN', 'TIKTOK_SIGN_API_KEY', 'TIKTOK_SESSION_ID', 'BRIDGE_TOKEN'];
 const NUMERIC_KEYS = ['PORT', 'AI_TRIGGER_SCORE', 'AI_COOLDOWN_SEC', 'ALERT_THRESHOLD', 'AUDIO_CHUNK_SEC', 'WATCHER_INTERVAL_SEC', 'WATCHER_COOLDOWN_SEC', 'INTERVENTION_COOLDOWN_SEC'];
 const BOOL_KEYS = ['AUDIO_ENABLED'];
 const JSON_KEYS = ['WATCHERS', 'INTERVENTIONS', 'MODERATION', 'PUTT_WEIGHTS'];

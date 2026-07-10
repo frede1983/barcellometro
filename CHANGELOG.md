@@ -4,6 +4,16 @@ Tutte le modifiche rilevanti del progetto sono documentate in questo file.
 Formato basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/),
 versionamento [SemVer](https://semver.org/lang/it/).
 
+## [1.4.0] - 2026-07-11
+
+### Aggiunto — Bridge TikTok 🌉
+- **Bridge locale + hub sul server**: risolve il blocco della firma TikTok dagli IP datacenter. Un piccolo script (`bridge/`) gira sul PC di casa (IP residenziale, dove la firma anonima passa), si collega al Barcellometro sul VPS via WebSocket con token e **inoltra tutti gli eventi** (chat, regali, share/follow/like, match, viewers, stream URL)
+- **RemoteTikTokSource**: quando il bridge è connesso, le nuove sorgenti TikTok passano automaticamente da esso; l'audio viene elaborato sul server usando lo stream URL inoltrato
+- Endpoint `/bridge` autenticato a token (separato dalla Basic Auth della dashboard); comandi start/stop automatici e riconnessione
+- Stato bridge nell'header (🌉) e badge "bridge" sulle sorgenti relative
+- Script pronto: `bridge/avvia-bridge.bat` (Windows) + `bridge/.env`
+- Impostazioni: token bridge e modalità "solo bridge"
+
 ## [1.3.1] - 2026-07-11
 
 ### Corretto / Migliorato

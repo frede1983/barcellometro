@@ -8,7 +8,7 @@
 
 *💖 Edizione speciale dedicata a [@cricetomannaro000](https://www.tiktok.com/@cricetomannaro000) 🐹💖*
 
-![Version](https://img.shields.io/badge/versione-1.3.0-ff1fb0?style=for-the-badge)
+![Version](https://img.shields.io/badge/versione-1.4.0-ff1fb0?style=for-the-badge)
 ![Status](https://img.shields.io/badge/🚧_WORK_IN_PROGRESS-ff69b4?style=for-the-badge)
 ![Drama](https://img.shields.io/badge/drama-100%25_certificato-ff8fd0?style=for-the-badge)
 
@@ -200,6 +200,28 @@ Il file [`.env`](.env.example) resta solo come bootstrap opzionale; `config.json
 - [x] v1.3 — Notifiche Telegram/Home Assistant
 - [x] v1.3 — Multi-lingua (IT/EN/ES) + punti putt configurabili
 - [x] v1.2/1.3 — Rilevamento barcello nei live match (linkMicBattle TikTok)
+
+## 🌉 Bridge TikTok (per deploy su VPS)
+
+TikTok richiede una **firma** sulla connessione WebSocket, delegata a Euler Stream. Questa firma anonima gratuita è concessa dagli **IP residenziali** (il tuo PC di casa) ma **bloccata dagli IP datacenter** (VPS) → errore *"This endpoint requires a Business plan"*.
+
+Il **bridge** risolve senza costi: un piccolo script gira sul PC di casa (IP residenziale), si collega a TikTok e inoltra tutti gli eventi al Barcellometro sul VPS.
+
+```
+[ PC di casa - IP residenziale ]                 [ VPS Hostinger ]
+  bridge/tiktok-bridge.js  ──── WebSocket /bridge (token) ────▶  Barcellometro
+  (firma TikTok OK)              inoltra chat/regali/eventi        dashboard, AI, scoring
+```
+
+### Setup
+1. Nel Barcellometro: *Impostazioni → TikTok → Token bridge*, scegli una password e salva
+2. Sul PC di casa: copia la cartella `bridge/`, apri `bridge/.env` e imposta:
+   - `BARCELLO_URL=ws://srv1013438.hstgr.cloud:3900`
+   - `BRIDGE_TOKEN=` (lo stesso token del punto 1)
+3. Doppio click su `bridge/avvia-bridge.bat`
+4. Nell'header della dashboard compare 🌉 **bridge** verde; da lì aggiungi le live TikTok come sempre — passano automaticamente dal bridge
+
+Se preferisci tutto in locale (senza VPS), esegui direttamente `install.bat` + `start.bat` sul PC di casa: il bridge non serve.
 
 ## Note legali e privacy
 

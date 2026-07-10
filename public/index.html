@@ -182,6 +182,7 @@
   </div>
   <div class="chips">
     <span id="chipWs" class="chip off">● server</span>
+    <span id="chipBridge" class="chip off">🌉 bridge</span>
     <span id="chipAudio" class="chip off">🎙 audio</span>
     <span id="chipAi" class="chip off">🤖 AI</span>
     <span id="chipMute" class="chip btn" onclick="toggleMute()">🔊 allarme</span>
@@ -443,6 +444,11 @@
     <div class="frow"><label>Session ID TikTok</label><input id="s_TIKTOK_SESSION_ID" type="password" placeholder="cookie sessionid (opzionale)"></div>
     <div class="hintrow">Session ID: login su tiktok.com → DevTools → Application → Cookies → <b>sessionid</b>. Sblocca live ristrette e riduce i rate-limit.</div>
 
+    <h3>🌉 Bridge locale (per VPS)</h3>
+    <div class="hintrow">Su IP datacenter la firma TikTok è bloccata. Con il <b>bridge</b> un piccolo script sul tuo PC di casa (IP residenziale) si collega a TikTok e inoltra tutto qui. Imposta un token qui e lo stesso nel file <code>bridge/.env</code>, poi lancia <code>avvia-bridge.bat</code> sul PC.</div>
+    <div class="frow"><label>Token bridge</label><input id="s_BRIDGE_TOKEN" type="password" placeholder="una password condivisa col PC di casa"></div>
+    <div class="frow"><label>Forza solo bridge</label><select id="s_BRIDGE_REQUIRED"><option value="false">No (usa locale se il bridge è giù)</option><option value="true">Sì (TikTok solo via bridge)</option></select></div>
+
     <h3>🌍 Lingue</h3>
     <div class="frow"><label>Rilevamento (csv: it,en,es)</label><input id="s_DETECT_LANGS" placeholder="it,en,es"></div>
     <div class="frow"><label>Lingua audio (Whisper)</label>
@@ -528,6 +534,7 @@ function connectWS() {
     else if (msg.type === 'watchPerson') fireWatchPerson(msg);
     else if (msg.type === 'match') showToast('⚔️ Match TikTok', `${msg.host} VS ${msg.opponent}`);
     else if (msg.type === 'clip') { showToast('🎬 Clip salvata', `${msg.sourceName} — picco ${msg.peakScore}/100`); if (activeTab === 'clip') loadClips(); }
+    else if (msg.type === 'bridge') { if (msg.status) setChip('chipBridge', msg.status.connected, msg.status.connected ? `🌉 bridge (${msg.status.active.length} live)` : '🌉 bridge off'); }
   };
 }
 connectWS();
@@ -556,6 +563,7 @@ function applySnapshot(s) {
   watchersCache = s.watchers || [];
   interventionsCache = s.interventions || [];
   if (s.version) $('verLabel').textContent = `v${s.version} — edizione @cricetomannaro000 🐹🍿`;
+  if (s.bridge) setChip('chipBridge', s.bridge.connected, s.bridge.connected ? `🌉 bridge (${s.bridge.active.length} live)` : '🌉 bridge off');
   setChip('chipAudio', s.whisper.available, s.whisper.available ? `🎙 audio (${s.whisper.model})` : '🎙 audio off');
   setChip('chipAi', s.ai.enabled, s.ai.enabled ? `🤖 AI ${s.ai.provider === 'claude-sdk' ? 'subscription' : 'API'}` : '🤖 AI off');
   renderSources(); renderWatchers(); renderInterventions();
@@ -654,6 +662,7 @@ function renderSources() {
         ${s.viewers != null ? `<span>👁 ${s.viewers}</span>` : ''}
         ${s.audioActive ? '<span class="badge audio">🎙 AUDIO</span>' : '<span>solo chat</span>'}
         ${s.matchOpponent ? `<span class="badge" style="background:#3a1a0e;color:var(--orange)">⚔️ VS ${esc(s.matchOpponent)}</span>` : ''}
+        ${s.viaBridge ? '<span class="badge" style="background:#12261f;color:#5fe0b0">🌉 bridge</span>' : ''}
         <span>${(levelFor(s.score)).emoji} ${(levelFor(s.score)).name}</span>
       </div>
       <div class="srcbar"><i style="width:${s.score}%;background:${colorFor(s.score)}"></i></div>
@@ -1095,7 +1104,7 @@ if (window.Notification && Notification.permission === 'default') {
 }
 
 // ---------- Impostazioni ----------
-const SETTING_FIELDS = ['AI_PROVIDER','AI_MODEL','ANTHROPIC_API_KEY','AI_TRIGGER_SCORE','AI_COOLDOWN_SEC','DISCORD_BOT_TOKEN','TTS_VOICE','TIKTOK_SIGN_API_KEY','TIKTOK_SESSION_ID','DETECT_LANGS','AUDIO_LANG','TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID','HA_URL','HA_TOKEN','HA_MEDIA_PLAYER','HA_TTS_ENTITY','NOTIFY_ON_ALERT','NOTIFY_ON_MODERATION','NOTIFY_ON_CROSSHOST','CLIPS_ENABLED','AUDIO_ENABLED','WHISPER_MODEL','AUDIO_CHUNK_SEC','WATCHER_INTERVAL_SEC','WATCHER_COOLDOWN_SEC','INTERVENTION_COOLDOWN_SEC','ALERT_THRESHOLD','DASH_PASSWORD','PORT'];
+const SETTING_FIELDS = ['AI_PROVIDER','AI_MODEL','ANTHROPIC_API_KEY','AI_TRIGGER_SCORE','AI_COOLDOWN_SEC','DISCORD_BOT_TOKEN','TTS_VOICE','TIKTOK_SIGN_API_KEY','TIKTOK_SESSION_ID','BRIDGE_TOKEN','BRIDGE_REQUIRED','DETECT_LANGS','AUDIO_LANG','TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID','HA_URL','HA_TOKEN','HA_MEDIA_PLAYER','HA_TTS_ENTITY','NOTIFY_ON_ALERT','NOTIFY_ON_MODERATION','NOTIFY_ON_CROSSHOST','CLIPS_ENABLED','AUDIO_ENABLED','WHISPER_MODEL','AUDIO_CHUNK_SEC','WATCHER_INTERVAL_SEC','WATCHER_COOLDOWN_SEC','INTERVENTION_COOLDOWN_SEC','ALERT_THRESHOLD','DASH_PASSWORD','PORT'];
 
 async function openSettings() {
   $('sErr').textContent = ''; $('sOk').textContent = ''; $('aiTestOut').textContent = '';
