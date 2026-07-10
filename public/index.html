@@ -23,12 +23,13 @@
   header h1 { font-size: 1.5rem; letter-spacing: 1px; }
   header h1 span { color: var(--accent); text-shadow: 0 0 12px rgba(255,31,176,0.6); }
   .brand small { display: block; font-size: 0.68rem; color: var(--muted); font-weight: 400; letter-spacing: 0.5px; }
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .chip { font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); color: var(--muted); }
   .chip.on { color: var(--green); border-color: var(--green); }
   .chip.off { color: var(--muted); }
   .chip.btn { cursor: pointer; user-select: none; }
   .chip.btn:hover { border-color: var(--text); color: var(--text); }
+  .chip.gear { font-size: 0.9rem; background: var(--accent); color: #fff; border: none; font-weight: 700; }
 
   main { max-width: 1400px; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: 400px 1fr; gap: 20px; }
   @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
@@ -36,24 +37,25 @@
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
   .panel h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 14px; }
 
-  /* GAUGE */
   #gaugeWrap { text-align: center; }
-  #gaugeLevel { font-size: 1.25rem; font-weight: 700; margin-top: -8px; min-height: 1.8rem; }
   #gaugeScore { font-size: 2.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
   #gaugeScore small { font-size: 1.1rem; color: var(--muted); }
+  #gaugeLevel { font-size: 1.25rem; font-weight: 700; margin-top: -8px; min-height: 1.8rem; }
 
-  /* FORMS */
-  .addrow { display: flex; gap: 8px; margin-bottom: 10px; }
-  input, select, button { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 0.9rem; }
-  input:focus, select:focus { outline: 1px solid var(--accent); }
-  input { flex: 1; min-width: 0; }
-  select { flex: 1; min-width: 0; }
+  .addrow { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  input, select, button, textarea { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 0.9rem; font-family: inherit; }
+  input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); }
+  input, select { flex: 1; min-width: 0; }
+  textarea { width: 100%; resize: vertical; }
   button { cursor: pointer; background: var(--accent); border: none; font-weight: 700; white-space: nowrap; }
   button:hover { filter: brightness(1.15); }
   button:disabled { opacity: 0.5; cursor: default; }
+  button.ghost { background: var(--panel2); border: 1px solid var(--border); color: var(--muted); font-weight: 400; }
+  button.ghost:hover { color: var(--text); border-color: var(--text); }
   .err { color: var(--red); font-size: 0.8rem; min-height: 1rem; margin-bottom: 6px; }
+  .okmsg { color: var(--green); font-size: 0.8rem; min-height: 1rem; }
+  .hintrow { color: var(--muted); font-size: 0.78rem; margin-bottom: 8px; }
 
-  /* SOURCE CARDS */
   .src { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
   .src .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .src .name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -68,8 +70,19 @@
   .src .rm:hover { color: var(--red); }
   .srcscore { font-weight: 800; font-variant-numeric: tabular-nums; }
 
-  /* FEED */
-  #feed { max-height: 520px; overflow-y: auto; display: flex; flex-direction: column-reverse; gap: 6px; }
+  /* liste watcher/interventi */
+  .witem { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .witem .wtop { display: flex; align-items: center; gap: 8px; }
+  .witem .wname { font-weight: 700; flex: 1; }
+  .witem .wprompt { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  .witem .wmode { font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; background: #1a2035; color: #7289da; font-weight: 700; }
+  .witem.dis { opacity: 0.45; }
+  .toggle { width: 34px; height: 18px; border-radius: 10px; background: var(--border); position: relative; cursor: pointer; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: all 0.2s; }
+  .toggle.on { background: var(--accent); }
+  .toggle.on::after { left: 18px; background: #fff; }
+
+  #feed { max-height: 640px; overflow-y: auto; display: flex; flex-direction: column-reverse; gap: 6px; }
   .ev { padding: 8px 10px; border-radius: 8px; background: var(--panel2); border-left: 3px solid var(--border); font-size: 0.85rem; }
   .ev .who { font-weight: 700; }
   .ev .src-tag { color: var(--muted); font-size: 0.7rem; }
@@ -78,20 +91,36 @@
   .ev.p1 { border-left-color: var(--yellow); }
   .ev.p2 { border-left-color: var(--orange); }
   .ev.p3 { border-left-color: var(--red); background: #2d0f22; }
-  .ev.kind-audio { border-style: solid; }
   .ev.kind-audio .who::before { content: "🎙 "; }
   .ev.kind-ai { border-left-color: #9b6dff; background: #191327; }
   .ev.kind-ai .who::before { content: "🤖 "; }
+  .ev.kind-watcher { border-left-color: var(--accent); background: #2a0d21; }
+  .ev.kind-bot { border-left-color: #7289da; background: #141a2b; }
   .ev.kind-system { color: var(--muted); font-style: italic; }
   mark { background: #4a1238; color: #ff9bdc; border-radius: 3px; padding: 0 2px; }
 
   #timeline { width: 100%; height: 110px; background: var(--panel2); border-radius: 8px; }
   .col { display: flex; flex-direction: column; gap: 20px; }
 
-  /* ALERT */
   #alertBox { position: fixed; top: 18px; left: 50%; transform: translateX(-50%) scale(0); background: linear-gradient(135deg, #ff1fb0, #ff3b4e); color: #fff; padding: 16px 30px; border-radius: 14px; font-weight: 800; font-size: 1.2rem; z-index: 99; box-shadow: 0 8px 40px rgba(255,31,176,0.55); transition: transform 0.25s; text-align: center; }
   #alertBox.show { transform: translateX(-50%) scale(1); }
   #alertBox small { display: block; font-weight: 400; font-size: 0.8rem; opacity: 0.9; }
+
+  #toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2); border: 1px solid var(--accent); border-radius: 12px; padding: 14px 18px; max-width: 340px; z-index: 98; transform: translateX(120%); transition: transform 0.3s; box-shadow: 0 6px 30px rgba(0,0,0,0.5); }
+  #toast.show { transform: translateX(0); }
+  #toast .t1 { font-weight: 700; color: var(--accent2); }
+  #toast .t2 { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+
+  /* modal impostazioni */
+  #modalBg { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 100; display: none; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 30px 12px; }
+  #modalBg.open { display: flex; }
+  #modal { background: var(--panel); border: 1px solid var(--accent); border-radius: 16px; max-width: 620px; width: 100%; padding: 22px; }
+  #modal h2 { color: var(--accent2); margin-bottom: 4px; }
+  #modal h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin: 18px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .frow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .frow label { flex: 0 0 190px; font-size: 0.82rem; color: var(--muted); }
+  .frow input, .frow select { flex: 1; }
+  .modalbtns { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -99,17 +128,19 @@
 <header>
   <div class="brand">
     <img src="avatar.jpg" alt="cricetomannaro000">
-    <h1>BARCELLO<span>METRO</span><small>edizione @cricetomannaro000 🐹🍿</small></h1>
+    <h1>BARCELLO<span>METRO</span><small id="verLabel">edizione @cricetomannaro000 🐹🍿</small></h1>
   </div>
   <div class="chips">
     <span id="chipWs" class="chip off">● server</span>
     <span id="chipAudio" class="chip off">🎙 audio</span>
     <span id="chipAi" class="chip off">🤖 AI</span>
     <span id="chipMute" class="chip btn" onclick="toggleMute()">🔊 allarme</span>
+    <button class="chip gear" onclick="openSettings()">⚙️ Impostazioni</button>
   </div>
 </header>
 
 <div id="alertBox">🚨 BARCELLO RILEVATO! 🚨<small id="alertSrc"></small></div>
+<div id="toast"><div class="t1"></div><div class="t2"></div></div>
 
 <main>
   <div class="col">
@@ -144,8 +175,9 @@
       <div class="err" id="ttErr"></div>
 
       <h2 style="margin-top:8px">➕ Aggiungi Discord</h2>
+      <div id="dcHint" class="hintrow" style="display:none">Bot non configurato: imposta il token in ⚙️ Impostazioni → Discord.</div>
       <div id="dcForms">
-        <div class="addrow"><select id="dcGuild" onchange="fillChannels()"><option>Caricamento...</option></select></div>
+        <div class="addrow"><select id="dcGuild" onchange="fillChannels()"><option value="">Caricamento server...</option></select></div>
         <div class="addrow"><select id="dcVoice"><option value="">🔇 Nessun canale vocale (solo chat)</option></select></div>
         <div class="addrow"><button id="dcBtn" onclick="addDiscord()" style="flex:1">Monitora server</button></div>
       </div>
@@ -154,7 +186,44 @@
 
     <div class="panel">
       <h2>📡 Sorgenti monitorate</h2>
-      <div id="srcList"><div style="color:var(--muted);font-size:0.85rem">Nessuna sorgente attiva. Aggiungi una live TikTok o un server Discord.</div></div>
+      <div id="srcList"><div class="hintrow">Nessuna sorgente attiva.</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>🔔 Rilevatori AI</h2>
+      <div class="hintrow">Avvisi personalizzati: descrivi cosa rilevare ("parlano di cucina", "nominano il criceto"...). Claude controlla il contesto a intervalli regolari.</div>
+      <div id="wList"></div>
+      <div class="addrow">
+        <input id="wName" placeholder="Nome (es. Cucina)" style="flex:0 0 130px">
+        <input id="wPrompt" placeholder="Cosa rilevare (es. parlano di cucina o ricette)" onkeydown="if(event.key==='Enter')addWatcher()">
+        <button onclick="addWatcher()">+</button>
+      </div>
+      <div class="err" id="wErr"></div>
+    </div>
+
+    <div class="panel">
+      <h2>🤖 Interventi bot Discord</h2>
+      <div class="hintrow">Quando il criterio scatta, il bot interviene nel server Discord: scrive in chat e/o parla nel canale vocale. Messaggio vuoto = lo scrive Claude in base al contesto.</div>
+      <div id="iList"></div>
+      <div class="addrow">
+        <input id="iName" placeholder="Nome (es. Calma il barcello)" style="flex:0 0 150px">
+        <select id="iMode" style="flex:0 0 110px">
+          <option value="chat">💬 chat</option>
+          <option value="voice">🔊 voce</option>
+          <option value="both">💬+🔊</option>
+        </select>
+      </div>
+      <div class="addrow">
+        <input id="iPrompt" placeholder="Criterio (es. il barcello supera 70, insultano il criceto...)">
+      </div>
+      <div class="addrow">
+        <input id="iReply" placeholder="Messaggio fisso (vuoto = generato da Claude)">
+        <button onclick="addIntervention()">+</button>
+      </div>
+      <div class="addrow">
+        <button class="ghost" onclick="testIntervention()" style="flex:1">🧪 Test intervento sul primo server attivo</button>
+      </div>
+      <div class="err" id="iErr"></div>
     </div>
   </div>
 
@@ -166,17 +235,92 @@
   </div>
 </main>
 
+<!-- MODAL IMPOSTAZIONI -->
+<div id="modalBg" onclick="if(event.target===this)closeSettings()">
+  <div id="modal">
+    <h2>⚙️ Impostazioni</h2>
+    <div class="hintrow">Tutto si salva su config.json e si applica a caldo (dove indicato serve riavvio).</div>
+
+    <h3>🤖 Intelligenza artificiale</h3>
+    <div class="frow"><label>Provider</label>
+      <select id="s_AI_PROVIDER">
+        <option value="claude-sdk">Claude SDK (subscription)</option>
+        <option value="api">Anthropic API (a consumo)</option>
+        <option value="off">Spenta (solo keyword)</option>
+      </select>
+    </div>
+    <div class="frow"><label>Modello</label><input id="s_AI_MODEL" placeholder="haiku (sdk) / claude-haiku-... (api)"></div>
+    <div class="frow"><label>API key Anthropic</label><input id="s_ANTHROPIC_API_KEY" type="password" placeholder=""></div>
+    <div class="frow"><label>Soglia giudizio AI (score)</label><input id="s_AI_TRIGGER_SCORE" type="number" min="10" max="100"></div>
+    <div class="frow"><label>Cooldown AI (sec)</label><input id="s_AI_COOLDOWN_SEC" type="number" min="15"></div>
+    <div class="frow"><label></label><button class="ghost" onclick="testAI()">🧪 Test AI</button><span id="aiTestOut" class="okmsg"></span></div>
+
+    <h3>💬 Discord</h3>
+    <div class="frow"><label>Token bot</label><input id="s_DISCORD_BOT_TOKEN" type="password" placeholder=""></div>
+    <div class="hintrow">Serve MESSAGE CONTENT INTENT attivo e bot invitato nel server (permessi: vedere canali, inviare messaggi, connettersi e parlare in vocale).</div>
+    <div class="frow"><label>Voce TTS interventi</label>
+      <select id="s_TTS_VOICE">
+        <option value="it-IT-DiegoNeural">Diego (maschile)</option>
+        <option value="it-IT-ElsaNeural">Elsa (femminile)</option>
+        <option value="it-IT-IsabellaNeural">Isabella (femminile)</option>
+        <option value="it-IT-GiuseppeMultilingualNeural">Giuseppe (multilingua)</option>
+      </select>
+    </div>
+
+    <h3>🎵 TikTok</h3>
+    <div class="frow"><label>API key Euler Stream</label><input id="s_TIKTOK_SIGN_API_KEY" type="password" placeholder=""></div>
+
+    <h3>🎙 Audio / Whisper</h3>
+    <div class="frow"><label>Analisi audio</label>
+      <select id="s_AUDIO_ENABLED"><option value="true">Attiva</option><option value="false">Spenta (solo chat)</option></select>
+    </div>
+    <div class="frow"><label>Modello Whisper</label>
+      <select id="s_WHISPER_MODEL">
+        <option value="tiny">tiny (velocissimo)</option>
+        <option value="base">base (veloce)</option>
+        <option value="small">small (consigliato)</option>
+        <option value="medium">medium (preciso, pesante)</option>
+      </select>
+    </div>
+    <div class="frow"><label>Durata chunk TikTok (sec)</label><input id="s_AUDIO_CHUNK_SEC" type="number" min="4" max="30"></div>
+
+    <h3>🔔 Rilevatori & interventi</h3>
+    <div class="frow"><label>Intervallo controllo (sec)</label><input id="s_WATCHER_INTERVAL_SEC" type="number" min="20"></div>
+    <div class="frow"><label>Cooldown rilevatori (sec)</label><input id="s_WATCHER_COOLDOWN_SEC" type="number" min="30"></div>
+    <div class="frow"><label>Cooldown interventi (sec)</label><input id="s_INTERVENTION_COOLDOWN_SEC" type="number" min="30"></div>
+
+    <h3>🚨 Allarme & sicurezza</h3>
+    <div class="frow"><label>Soglia allarme barcello</label><input id="s_ALERT_THRESHOLD" type="number" min="30" max="100"></div>
+    <div class="frow"><label>Password dashboard</label><input id="s_DASH_PASSWORD" type="password" placeholder=""></div>
+    <div class="hintrow">Utente: <b>barcello</b>. Lascia vuoto per non cambiare, scrivi <b>-</b> per rimuovere la password.</div>
+
+    <h3>🖥 Sistema</h3>
+    <div class="frow"><label>Porta (richiede riavvio)</label><input id="s_PORT" type="number" min="1" max="65535"></div>
+
+    <div class="err" id="sErr"></div>
+    <div class="okmsg" id="sOk"></div>
+    <div class="modalbtns">
+      <button onclick="saveSettings()" style="flex:1">💾 Salva impostazioni</button>
+      <button class="ghost" onclick="restartServer()">🔄 Riavvia server</button>
+      <button class="ghost" onclick="closeSettings()">Chiudi</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
 let muted = localStorage.getItem('bm_mute') === '1';
 let sourcesCache = [];
-let history = []; // {t, score}
+let watchersCache = [];
+let interventionsCache = [];
+let history = [];
 updateMuteChip();
 
 // ---------- WebSocket ----------
 let ws;
 function connectWS() {
-  ws = new WebSocket(`ws://${location.host}/ws`);
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
   ws.onopen = () => setChip('chipWs', true, '● server');
   ws.onclose = () => { setChip('chipWs', false, '● server'); setTimeout(connectWS, 2000); };
   ws.onmessage = (e) => {
@@ -185,6 +329,7 @@ function connectWS() {
     else if (msg.type === 'scores') applyScores(msg);
     else if (msg.type === 'event') addFeedEvent(msg.event);
     else if (msg.type === 'alert') fireAlert(msg);
+    else if (msg.type === 'watcherAlert') fireWatcherAlert(msg);
   };
 }
 connectWS();
@@ -197,14 +342,16 @@ function setChip(id, on, label) {
 
 function applySnapshot(s) {
   sourcesCache = s.sources;
+  watchersCache = s.watchers || [];
+  interventionsCache = s.interventions || [];
+  if (s.version) $('verLabel').textContent = `v${s.version} — edizione @cricetomannaro000 🐹🍿`;
   setChip('chipAudio', s.whisper.available, s.whisper.available ? `🎙 audio (${s.whisper.model})` : '🎙 audio off');
-  setChip('chipAi', s.ai.enabled, s.ai.enabled ? '🤖 AI attiva' : '🤖 AI off');
-  renderSources();
+  setChip('chipAi', s.ai.enabled, s.ai.enabled ? `🤖 AI ${s.ai.provider === 'claude-sdk' ? 'subscription' : 'API'}` : '🤖 AI off');
+  renderSources(); renderWatchers(); renderInterventions();
   setGauge(s.global);
+  $('dcHint').style.display = s.discordReady ? 'none' : 'block';
+  $('dcForms').style.display = s.discordReady ? 'block' : 'none';
   if (s.discordReady) loadGuilds();
-  else {
-    $('dcForms').innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Bot non configurato: aggiungi DISCORD_BOT_TOKEN nel file .env e riavvia.</div>';
-  }
 }
 
 function applyScores(m) {
@@ -228,8 +375,7 @@ function colorFor(score) {
   return 'var(--green)';
 }
 function setGauge(score, level) {
-  const arc = $('gaugeArc');
-  arc.style.strokeDashoffset = 377 - (377 * score / 100);
+  $('gaugeArc').style.strokeDashoffset = 377 - (377 * score / 100);
   $('needle').setAttribute('transform', `rotate(${-90 + 180 * score / 100} 150 160)`);
   $('gaugeScore').innerHTML = `${score}<small>/100</small>`;
   const lvl = level || levelFor(score);
@@ -252,7 +398,7 @@ function drawTimeline() {
   const h = cv.height = 220;
   const ctx = cv.getContext('2d');
   ctx.clearRect(0, 0, w, h);
-  ctx.strokeStyle = '#2a2e3a';
+  ctx.strokeStyle = '#47183a';
   [25, 50, 75].forEach(p => {
     ctx.beginPath(); ctx.moveTo(0, h - h * p / 100); ctx.lineTo(w, h - h * p / 100); ctx.stroke();
   });
@@ -269,10 +415,12 @@ function drawTimeline() {
 }
 
 // ---------- Sorgenti ----------
+function esc(s) { return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
 function renderSources() {
   const box = $('srcList');
   if (!sourcesCache.length) {
-    box.innerHTML = '<div style="color:var(--muted);font-size:0.85rem">Nessuna sorgente attiva. Aggiungi una live TikTok o un server Discord.</div>';
+    box.innerHTML = '<div class="hintrow">Nessuna sorgente attiva. Aggiungi una live TikTok o un server Discord.</div>';
     return;
   }
   box.innerHTML = sourcesCache.map(s => `
@@ -305,7 +453,6 @@ async function addTikTok() {
     const r = await fetch('/api/sources/tiktok', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: u }) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
-    $('ttUser').value = '';
   } catch (err) { $('ttErr').textContent = err.message; }
   $('ttBtn').disabled = false; $('ttBtn').textContent = 'Monitora';
 }
@@ -318,15 +465,15 @@ async function loadGuilds() {
     if (!d.ready) return;
     guildsData = d.guilds;
     const sel = $('dcGuild');
-    if (!sel) return;
+    const cur = sel.value;
     sel.innerHTML = guildsData.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('') || '<option value="">Nessun server (invita il bot)</option>';
+    if (cur && guildsData.some(g => g.id === cur)) sel.value = cur;
     fillChannels();
   } catch { /* ignore */ }
 }
 function fillChannels() {
   const g = guildsData.find(x => x.id === $('dcGuild').value);
-  const v = $('dcVoice');
-  v.innerHTML = '<option value="">🔇 Nessun canale vocale (solo chat)</option>' +
+  $('dcVoice').innerHTML = '<option value="">🔇 Nessun canale vocale (solo chat)</option>' +
     (g ? g.voiceChannels.map(c => `<option value="${c.id}">🔊 ${esc(c.name)}</option>`).join('') : '');
 }
 async function addDiscord() {
@@ -345,8 +492,73 @@ async function removeSource(id) {
   await fetch(`/api/sources/${id}`, { method: 'DELETE' });
 }
 
+// ---------- Rilevatori (watchers) ----------
+function renderWatchers() {
+  $('wList').innerHTML = watchersCache.map(w => `
+    <div class="witem ${w.enabled ? '' : 'dis'}">
+      <div class="wtop">
+        <div class="toggle ${w.enabled ? 'on' : ''}" onclick="toggleWatcher('${w.id}', ${!w.enabled})"></div>
+        <span class="wname">🔔 ${esc(w.name)}</span>
+        <button class="rm ghost" style="border:none;background:none;color:var(--muted)" onclick="delWatcher('${w.id}')">✕</button>
+      </div>
+      <div class="wprompt">${esc(w.prompt)}</div>
+    </div>`).join('') || '<div class="hintrow">Nessun rilevatore. Esempi: "parlano di cucina", "nominano il criceto", "qualcuno chiede soldi".</div>';
+}
+async function addWatcher() {
+  $('wErr').textContent = '';
+  const name = $('wName').value.trim(), prompt = $('wPrompt').value.trim();
+  if (!prompt) { $('wErr').textContent = 'Descrivi cosa rilevare'; return; }
+  const r = await fetch('/api/watchers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, prompt }) });
+  if (r.ok) { $('wName').value = ''; $('wPrompt').value = ''; }
+  else $('wErr').textContent = (await r.json()).error || 'errore';
+}
+async function toggleWatcher(id, enabled) {
+  await fetch(`/api/watchers/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled }) });
+}
+async function delWatcher(id) {
+  await fetch(`/api/watchers/${id}`, { method: 'DELETE' });
+}
+
+// ---------- Interventi bot ----------
+const MODE_LABEL = { chat: '💬 chat', voice: '🔊 voce', both: '💬+🔊' };
+function renderInterventions() {
+  $('iList').innerHTML = interventionsCache.map(w => `
+    <div class="witem ${w.enabled ? '' : 'dis'}">
+      <div class="wtop">
+        <div class="toggle ${w.enabled ? 'on' : ''}" onclick="toggleIntervention('${w.id}', ${!w.enabled})"></div>
+        <span class="wname">🤖 ${esc(w.name)}</span>
+        <span class="wmode">${MODE_LABEL[w.mode] || w.mode}</span>
+        <button class="rm ghost" style="border:none;background:none;color:var(--muted)" onclick="delIntervention('${w.id}')">✕</button>
+      </div>
+      <div class="wprompt">SE: ${esc(w.prompt)}</div>
+      <div class="wprompt">DICE: ${w.reply ? esc(w.reply) : '<i>generato da Claude in base al contesto</i>'}</div>
+    </div>`).join('') || '<div class="hintrow">Nessun intervento configurato. Esempio: SE "il barcello supera 70" → il bot entra in chat/voce e riporta la calma.</div>';
+}
+async function addIntervention() {
+  $('iErr').textContent = '';
+  const body = { name: $('iName').value.trim(), prompt: $('iPrompt').value.trim(), mode: $('iMode').value, reply: $('iReply').value.trim() };
+  if (!body.prompt) { $('iErr').textContent = 'Descrivi il criterio di intervento'; return; }
+  const r = await fetch('/api/interventions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (r.ok) { $('iName').value = ''; $('iPrompt').value = ''; $('iReply').value = ''; }
+  else $('iErr').textContent = (await r.json()).error || 'errore';
+}
+async function toggleIntervention(id, enabled) {
+  await fetch(`/api/interventions/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled }) });
+}
+async function delIntervention(id) {
+  await fetch(`/api/interventions/${id}`, { method: 'DELETE' });
+}
+async function testIntervention() {
+  $('iErr').textContent = '';
+  const dc = sourcesCache.find(s => s.platform === 'discord');
+  if (!dc) { $('iErr').textContent = 'Nessuna sorgente Discord attiva: aggiungi prima il server'; return; }
+  const r = await fetch('/api/interventions/test', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sourceId: dc.id, mode: $('iMode').value }) });
+  const d = await r.json();
+  $('iErr').textContent = d.ok ? '' : (d.error || 'test fallito');
+  if (d.ok) showToast('🧪 Test inviato', `Intervento ${$('iMode').value} su ${dc.name}`);
+}
+
 // ---------- Feed ----------
-function esc(s) { return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function addFeedEvent(ev) {
   const feed = $('feed');
   const div = document.createElement('div');
@@ -370,34 +582,47 @@ function addFeedEvent(ev) {
   while (feed.children.length > 200) feed.removeChild(feed.firstChild);
 }
 
-// ---------- Allarme ----------
+// ---------- Allarmi & toast ----------
 let audioCtx;
-function siren() {
+function beep(freqs, dur, gain) {
   if (muted) return;
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     const g = audioCtx.createGain();
-    g.gain.value = 0.12; g.connect(audioCtx.destination);
+    g.gain.value = gain; g.connect(audioCtx.destination);
     const o = audioCtx.createOscillator();
     o.type = 'sawtooth'; o.connect(g);
     const t = audioCtx.currentTime;
-    for (let i = 0; i < 6; i++) {
-      o.frequency.setValueAtTime(i % 2 ? 620 : 880, t + i * 0.28);
-    }
-    o.start(t); o.stop(t + 1.7);
-    g.gain.setValueAtTime(0.12, t + 1.5);
-    g.gain.linearRampToValueAtTime(0, t + 1.7);
+    freqs.forEach((f, i) => o.frequency.setValueAtTime(f, t + i * (dur / freqs.length)));
+    o.start(t); o.stop(t + dur);
+    g.gain.setValueAtTime(gain, t + dur - 0.2);
+    g.gain.linearRampToValueAtTime(0, t + dur);
   } catch { /* ignore */ }
 }
 function fireAlert(m) {
   $('alertSrc').textContent = `${m.platform}: ${m.sourceName} — livello ${m.global}/100`;
   $('alertBox').classList.add('show');
   document.body.classList.add('alerting');
-  siren();
-  if (Notification && Notification.permission === 'granted') {
-    new Notification('🚨 BARCELLO RILEVATO!', { body: `${m.sourceName} — ${m.global}/100 🍿` });
+  beep([880, 620, 880, 620, 880, 620], 1.7, 0.12);
+  if (window.Notification && Notification.permission === 'granted') {
+    new Notification('🚨 BARCELLO RILEVATO!', { body: `${m.sourceName} — ${m.global}/100 🍿`, icon: 'avatar.jpg' });
   }
   setTimeout(() => { $('alertBox').classList.remove('show'); document.body.classList.remove('alerting'); }, 8000);
+}
+function fireWatcherAlert(m) {
+  showToast(`🔔 ${m.watcher}`, `${m.sourceName}: ${m.evidenza || 'condizione rilevata'}`);
+  beep([740, 990], 0.5, 0.08);
+  if (window.Notification && Notification.permission === 'granted') {
+    new Notification(`🔔 ${m.watcher}`, { body: `${m.sourceName}: ${m.evidenza || ''}`, icon: 'avatar.jpg' });
+  }
+}
+let toastTimer;
+function showToast(t1, t2) {
+  $('toast').querySelector('.t1').textContent = t1;
+  $('toast').querySelector('.t2').textContent = t2;
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('toast').classList.remove('show'), 7000);
 }
 function toggleMute() {
   muted = !muted;
@@ -410,6 +635,71 @@ function updateMuteChip() {
 if (window.Notification && Notification.permission === 'default') {
   setTimeout(() => Notification.requestPermission(), 3000);
 }
+
+// ---------- Impostazioni ----------
+const SETTING_FIELDS = ['AI_PROVIDER','AI_MODEL','ANTHROPIC_API_KEY','AI_TRIGGER_SCORE','AI_COOLDOWN_SEC','DISCORD_BOT_TOKEN','TTS_VOICE','TIKTOK_SIGN_API_KEY','AUDIO_ENABLED','WHISPER_MODEL','AUDIO_CHUNK_SEC','WATCHER_INTERVAL_SEC','WATCHER_COOLDOWN_SEC','INTERVENTION_COOLDOWN_SEC','ALERT_THRESHOLD','DASH_PASSWORD','PORT'];
+
+async function openSettings() {
+  $('sErr').textContent = ''; $('sOk').textContent = ''; $('aiTestOut').textContent = '';
+  try {
+    const r = await fetch('/api/settings');
+    const { settings } = await r.json();
+    for (const k of SETTING_FIELDS) {
+      const el = $(`s_${k}`);
+      if (!el) continue;
+      const v = settings[k];
+      if (v && typeof v === 'object' && v.secret) {
+        el.value = '';
+        el.placeholder = v.set ? `impostato (${v.hint}) — vuoto = non cambiare, "-" = cancella` : 'non impostato';
+      } else {
+        el.value = String(v ?? '');
+      }
+    }
+    $('modalBg').classList.add('open');
+  } catch (err) {
+    alert('Errore caricamento impostazioni: ' + err.message);
+  }
+}
+function closeSettings() { $('modalBg').classList.remove('open'); }
+
+async function saveSettings() {
+  $('sErr').textContent = ''; $('sOk').textContent = '';
+  const patch = {};
+  for (const k of SETTING_FIELDS) {
+    const el = $(`s_${k}`);
+    if (el) patch[k] = el.value;
+  }
+  try {
+    const r = await fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'errore');
+    let msg = d.changed.length ? `Salvato: ${d.changed.join(', ')}` : 'Nessuna modifica';
+    if (d.applied?.length) msg += ` — ${d.applied.join(' · ')}`;
+    if (d.needsRestart?.length) msg += ` — ⚠️ riavvio necessario per: ${d.needsRestart.join(', ')}`;
+    $('sOk').textContent = msg;
+  } catch (err) {
+    $('sErr').textContent = err.message;
+  }
+}
+
+async function testAI() {
+  $('aiTestOut').textContent = '...';
+  try {
+    const r = await fetch('/api/settings/test-ai', { method: 'POST' });
+    const d = await r.json();
+    $('aiTestOut').textContent = d.ok ? `✅ ok in ${d.ms}ms (barcello: ${d.verdict.barcello ? 'sì' : 'no'} ${d.verdict.intensita})` : `❌ ${d.error}`;
+  } catch (err) {
+    $('aiTestOut').textContent = '❌ ' + err.message;
+  }
+}
+
+async function restartServer() {
+  if (!confirm('Riavviare il server del Barcellometro?')) return;
+  try { await fetch('/api/restart', { method: 'POST' }); } catch { /* il server muore subito */ }
+  $('sOk').textContent = 'Riavvio... la pagina si ricollega da sola';
+  closeSettings();
+}
+
 window.addEventListener('resize', drawTimeline);
 </script>
 </body>

@@ -8,7 +8,7 @@
 
 *💖 Edizione speciale dedicata a [@cricetomannaro000](https://www.tiktok.com/@cricetomannaro000) 🐹💖*
 
-![Version](https://img.shields.io/badge/versione-1.0.0-ff1fb0?style=for-the-badge)
+![Version](https://img.shields.io/badge/versione-1.1.0-ff1fb0?style=for-the-badge)
 ![Status](https://img.shields.io/badge/🚧_WORK_IN_PROGRESS-ff69b4?style=for-the-badge)
 ![Drama](https://img.shields.io/badge/drama-100%25_certificato-ff8fd0?style=for-the-badge)
 
@@ -74,6 +74,20 @@ Due provider supportati:
 | `api` | `ANTHROPIC_API_KEY` | Pay-per-token |
 
 Senza AI il Barcellometro funziona comunque in modalità solo keyword+euristiche.
+
+### 🔔 Rilevatori AI personalizzati
+
+Oltre al barcello, puoi definire dalla dashboard **rilevatori su misura** in linguaggio naturale: *"avvisami se parlano di cucina"*, *"se nominano il criceto"*, *"se qualcuno chiede soldi"*. A intervalli regolari (configurabile) Claude analizza il contesto recente di ogni sorgente e, quando una condizione è soddisfatta, ricevi notifica + toast + evento nel feed, con la citazione che lo dimostra. Cooldown anti-spam per rilevatore.
+
+### 🤖 Interventi attivi del bot Discord
+
+Il bot non si limita a osservare: nella sezione dedicata della UI definisci **criteri di intervento** e il bot agisce nel server quando scattano:
+
+- **💬 Chat** — scrive un messaggio nel canale testuale attivo
+- **🔊 Voce** — *parla* nel canale vocale con voce neurale italiana (Edge TTS, 4 voci disponibili)
+- Il messaggio può essere **fisso** (lo scrivi tu) o **generato da Claude** in base a quello che sta succedendo
+- Esempi: *"se il barcello supera 70 → riporta la calma"*, *"se insultano il criceto → difendilo"*
+- Cooldown configurabile e test immediato dalla UI
 
 ## Architettura
 
@@ -141,7 +155,9 @@ Per il deploy con systemd vedi [`deploy/`](deploy/).
 
 ## Configurazione
 
-Tutte le opzioni in [`.env.example`](.env.example). Le principali:
+**Tutto è configurabile dalla dashboard** (⚙️ Impostazioni): token Discord, provider e modello AI, chiavi API, modello Whisper (ricaricato a caldo), soglie, cooldown, password, voce TTS, rilevatori e interventi. Le modifiche si salvano in `config.json` e si applicano senza riavvio (dove serve il riavvio, c'è il pulsante 🔄 nella UI).
+
+Il file [`.env`](.env.example) resta solo come bootstrap opzionale; `config.json` ha sempre la precedenza. Chiavi principali:
 
 | Variabile | Descrizione | Default |
 |---|---|---|
@@ -173,6 +189,9 @@ Tutte le opzioni in [`.env.example`](.env.example). Le principali:
 ## Roadmap
 
 - [x] v1.0 — Chat + audio TikTok/Discord, scoring ibrido, dashboard, allarmi
+- [x] v1.1 — Configurazione completa dalla UI (config.json + hot-apply)
+- [x] v1.1 — Rilevatori AI personalizzati ("avvisami se parlano di...")
+- [x] v1.1 — Interventi attivi del bot Discord in chat e in voce (Edge TTS)
 - [ ] Storico barcelli con replay della timeline
 - [ ] Clip automatiche dei momenti di picco
 - [ ] Notifiche Telegram/Home Assistant

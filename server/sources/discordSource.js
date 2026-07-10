@@ -9,14 +9,16 @@ const {
 } = require('discord.js');
 const {
   joinVoiceChannel, EndBehaviorType, VoiceConnectionStatus, entersState,
+  createAudioPlayer, createAudioResource, StreamType, AudioPlayerStatus,
 } = require('@discordjs/voice');
+const { Readable } = require('stream');
 const prism = require('prism-media');
 const { pcm16ToWav, rms, down48kStereoTo16kMono } = require('../audio/wav');
 
 let client = null;
 let ready = false;
 
-/** Avvia il client bot (una volta sola). Ritorna true se pronto. */
+/** Avvia il client bot. Ritorna true se pronto. */
 async function initDiscord(token) {
   if (!token) return false;
   if (ready) return true;
@@ -28,15 +30,31 @@ async function initDiscord(token) {
       GatewayIntentBits.GuildVoiceStates,
     ],
   });
-  await client.login(token);
-  await new Promise((resolve) => {
-    if (client.isReady()) return resolve();
-    client.once('clientReady', resolve);
-    client.once('ready', resolve); // compat v14
-  });
+  try {
+    await client.login(token);
+    await new Promise((resolve) => {
+      if (client.isReady()) return resolve();
+      client.once('clientReady', resolve);
+      client.once('ready', resolve); // compat v14
+    });
+  } catch (err) {
+    try { await client.destroy(); } catch { /* ignore */ }
+    client = null;
+    ready = false;
+    throw err;
+  }
   ready = true;
   console.log(`[discord] Bot connesso come ${client.user.tag}`);
   return true;
+}
+
+/** Spegne il client (per cambio token a caldo) */
+async function shutdownDiscord() {
+  if (client) {
+    try { await client.destroy(); } catch { /* ignore */ }
+  }
+  client = null;
+  ready = false;
 }
 
 function isDiscordReady() { return ready; }
@@ -68,6 +86,8 @@ class DiscordSource {
     this.msgHandler = null;
     this.subscriptions = new Map(); // userId -> true
     this.stopped = false;
+    this.lastTextChannelId = null;  // canale con l'ultima attivita' (per gli interventi)
+    this.audioPlayer = null;
   }
 
   async start() {
@@ -82,6 +102,7 @@ class DiscordSource {
       if (msg.guildId !== this.cfg.guildId) return;
       if (msg.author?.bot) return;
       if (textIds.size > 0 && !textIds.has(msg.channelId)) return;
+      this.lastTextChannelId = msg.channelId;
       const content = msg.content || '';
       if (content) this.cfg.onChat(msg.author.username, content, `#${msg.channel?.name || '?'}`);
     };
@@ -165,11 +186,57 @@ class DiscordSource {
     opus.on('error', (e) => { console.error('[discord voice]', e.message); });
   }
 
+  /**
+   * Intervento attivo del bot.
+   * mode: 'chat' | 'voice' | 'both'. Ritorna { chat: bool, voice: bool }
+   */
+  async intervene(mode, text, ttsVoice) {
+    const done = { chat: false, voice: false };
+    if (!text || this.stopped) return done;
+
+    if (mode === 'chat' || mode === 'both') {
+      try {
+        const chId = this.lastTextChannelId
+          || (this.cfg.textChannelIds || [])[0]
+          || this.guild.channels.cache.find(c => c.type === ChannelType.GuildText && c.permissionsFor(client.user)?.has('SendMessages'))?.id;
+        const ch = chId && this.guild.channels.cache.get(chId);
+        if (ch) {
+          await ch.send(`🍿 **Barcellometro**: ${text}`);
+          done.chat = true;
+        }
+      } catch (err) {
+        console.error('[discord/intervento chat]', err.message);
+      }
+    }
+
+    if ((mode === 'voice' || mode === 'both') && this.voiceConnection) {
+      try {
+        const mp3 = await (this.cfg.whisper?.tts ? this.cfg.whisper.tts(text, ttsVoice) : null);
+        if (mp3) {
+          if (!this.audioPlayer) {
+            this.audioPlayer = createAudioPlayer();
+            this.voiceConnection.subscribe(this.audioPlayer);
+          }
+          // Non sovrapporre: se sta gia' parlando, salta
+          if (this.audioPlayer.state.status !== AudioPlayerStatus.Playing) {
+            const resource = createAudioResource(Readable.from(mp3), { inputType: StreamType.Arbitrary });
+            this.audioPlayer.play(resource);
+            done.voice = true;
+          }
+        }
+      } catch (err) {
+        console.error('[discord/intervento voce]', err.message);
+      }
+    }
+    return done;
+  }
+
   async stop() {
     this.stopped = true;
     if (this.msgHandler) client.off('messageCreate', this.msgHandler);
+    try { this.audioPlayer?.stop(); } catch { /* ignore */ }
     try { this.voiceConnection?.destroy(); } catch { /* ignore */ }
   }
 }
 
-module.exports = { initDiscord, isDiscordReady, listGuilds, DiscordSource };
+module.exports = { initDiscord, shutdownDiscord, isDiscordReady, listGuilds, DiscordSource };

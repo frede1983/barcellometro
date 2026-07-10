@@ -20,16 +20,19 @@ Rispondi SOLO con JSON valido, nessun altro testo:
 intensita: 0-30 tranquillo, 40-60 tensione/frecciatine, 60-80 litigio acceso, 80-100 rissa verbale totale.`;
 
 class AIClassifier {
-  constructor({ provider, apiKey, model, triggerScore, cooldownSec }) {
+  constructor(opts) {
+    this.pending = new Set();
+    this.cliAvailable = null; // verificato all'avvio
+    this.reconfigure(opts);
+  }
+
+  /** Applica (o ri-applica a caldo) la configurazione */
+  reconfigure({ provider, apiKey, model, triggerScore, cooldownSec }) {
     this.apiKey = apiKey || '';
-    // auto: claude-sdk se non c'e' API key, altrimenti api
     this.provider = provider || (this.apiKey ? 'api' : 'claude-sdk');
-    if (this.provider === 'off') this.provider = 'off';
     this.model = model || (this.provider === 'claude-sdk' ? 'haiku' : 'claude-haiku-4-5-20251001');
     this.triggerScore = triggerScore || 40;
     this.cooldownMs = (cooldownSec || 90) * 1000;
-    this.pending = new Set();
-    this.cliAvailable = null; // verificato all'avvio
   }
 
   get enabled() {
@@ -71,8 +74,8 @@ class AIClassifier {
       if (!context.trim()) return null;
       const userPrompt = `Live: ${sourceName}\nUltimi messaggi/trascrizioni:\n${context}\n\nVerdetto JSON:`;
       const raw = this.provider === 'claude-sdk'
-        ? await this._viaCli(userPrompt)
-        : await this._viaApi(userPrompt);
+        ? await this._viaCli(userPrompt, SYSTEM)
+        : await this._viaApi(userPrompt, SYSTEM);
       if (!raw) return null;
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (!jsonMatch) return null;
@@ -91,14 +94,69 @@ class AIClassifier {
     }
   }
 
+  /**
+   * Rilevatori personalizzati: controlla in un'unica chiamata quali condizioni
+   * definite dall'utente sono soddisfatte dal contesto recente.
+   * watchers: [{id, name, prompt}] -> ritorna [{id, match, evidenza}] o null
+   */
+  async checkWatchers(context, watchers, sourceName) {
+    if (!this.enabled || !watchers.length || !context.trim()) return null;
+    const lista = watchers.map(w => `- id "${w.id}": ${w.name} -> ${w.prompt}`).join('\n');
+    const sys = `Sei un analista di live italiane (TikTok/Discord). Ricevi gli ultimi messaggi di chat e trascrizioni audio di una live e una lista di CONDIZIONI DI RILEVAMENTO definite dall'utente.
+Per OGNI condizione stabilisci se e' chiaramente soddisfatta nel contesto (non basta una parola ambigua: serve che se ne parli davvero).
+Rispondi SOLO con JSON valido:
+{"risultati":[{"id":"...","match":true|false,"evidenza":"breve citazione o frase che lo dimostra, vuota se match=false"}]}`;
+    const userPrompt = `Live: ${sourceName}\n\nCONDIZIONI:\n${lista}\n\nCONTESTO:\n${context}\n\nJSON:`;
+    try {
+      const raw = this.provider === 'claude-sdk'
+        ? await this._viaCli(userPrompt, sys)
+        : await this._viaApi(userPrompt, sys);
+      if (!raw) return null;
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (!Array.isArray(parsed.risultati)) return null;
+      return parsed.risultati.map(r => ({
+        id: String(r.id || ''),
+        match: Boolean(r.match),
+        evidenza: String(r.evidenza || '').slice(0, 200),
+      }));
+    } catch (err) {
+      console.error('[ai/watchers] errore:', err.message);
+      return null;
+    }
+  }
+
+  /**
+   * Genera il messaggio di intervento del bot (breve, italiano) in base
+   * al contesto della live e al criterio scattato.
+   */
+  async generateIntervention(context, intervention, sourceName) {
+    if (!this.enabled) return null;
+    const sys = `Sei "Barcellometro", il bot ufficiale anti-drama di un server Discord italiano. Tono: simpatico, diretto, un filo teatrale, MAI offensivo, max 2 frasi brevi.
+Devi scrivere UN SOLO messaggio di intervento da inviare ora nel canale, coerente con il motivo dell'intervento e con quello che sta succedendo.
+Niente prefissi, niente virgolette, niente emoji eccessive (max 2). Rispondi SOLO con il messaggio.`;
+    const userPrompt = `Server: ${sourceName}\nMotivo intervento: ${intervention.name} — ${intervention.prompt}\n\nContesto recente:\n${context}\n\nMessaggio:`;
+    try {
+      const raw = this.provider === 'claude-sdk'
+        ? await this._viaCli(userPrompt, sys)
+        : await this._viaApi(userPrompt, sys);
+      if (!raw) return null;
+      return raw.trim().replace(/^["']|["']$/g, '').slice(0, 250);
+    } catch (err) {
+      console.error('[ai/intervento] errore:', err.message);
+      return null;
+    }
+  }
+
   /** Claude Code CLI in modalita' headless: prompt via stdin, output JSON */
-  _viaCli(userPrompt) {
+  _viaCli(userPrompt, systemPrompt) {
     return new Promise((resolve) => {
       const args = [
         '-p',
         '--output-format', 'json',
         '--model', this.model,
-        '--append-system-prompt', SYSTEM,
+        '--append-system-prompt', systemPrompt || SYSTEM,
       ];
       const p = spawn('claude', args, {
         shell: process.platform === 'win32',
@@ -130,7 +188,7 @@ class AIClassifier {
   }
 
   /** Anthropic API diretta */
-  async _viaApi(userPrompt) {
+  async _viaApi(userPrompt, systemPrompt) {
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: {
@@ -140,8 +198,8 @@ class AIClassifier {
       },
       body: JSON.stringify({
         model: this.model,
-        max_tokens: 300,
-        system: SYSTEM,
+        max_tokens: 500,
+        system: systemPrompt || SYSTEM,
         messages: [{ role: 'user', content: userPrompt }],
       }),
     });

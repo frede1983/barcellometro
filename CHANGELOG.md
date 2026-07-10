@@ -4,6 +4,20 @@ Tutte le modifiche rilevanti del progetto sono documentate in questo file.
 Formato basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/),
 versionamento [SemVer](https://semver.org/lang/it/).
 
+## [1.1.0] - 2026-07-11
+
+### Aggiunto
+- **Configurazione completa dalla UI** (⚙️ Impostazioni): AI, Discord, TikTok, audio, soglie, password, porta. Persistenza su `config.json` (precedenza su `.env`), applicazione a caldo: re-init bot Discord al cambio token, reload del modello Whisper senza riavvio, riavvio del server dal pannello
+- **Rilevatori AI personalizzati** 🔔: condizioni in linguaggio naturale ("parlano di cucina", "nominano il criceto") verificate periodicamente da Claude sul contesto di ogni sorgente; notifiche browser + toast + eventi nel feed, cooldown configurabile
+- **Interventi attivi del bot Discord** 🤖: criteri di intervento definiti dalla UI; al trigger il bot scrive in chat e/o **parla nel canale vocale** con voce neurale italiana (Edge TTS, 4 voci). Messaggio fisso o generato da Claude in base al contesto; test immediato dalla UI
+- Endpoint `POST /tts` nel sidecar audio (Edge TTS) e `POST /reload` per cambio modello Whisper a caldo
+- Test AI dal pannello impostazioni (latenza + verdetto di prova)
+- Versione visibile nell'header della dashboard
+
+### Modificato
+- Il sidecar Whisper legge `config.json` (modello scelto dalla UI) con fallback su env
+- Messaggi d'errore più chiari quando bot/AI non sono configurati
+
 ## [1.0.0] - 2026-07-10
 
 🚧 Prima release pubblica — Work in Progress.

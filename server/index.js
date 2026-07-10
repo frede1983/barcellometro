@@ -1,6 +1,7 @@
 /**
  * BARCELLOMETRO - Server principale
- * Express + WebSocket. Orchestra sorgenti (TikTok/Discord), scoring, AI, allarmi.
+ * Express + WebSocket. Orchestra sorgenti (TikTok/Discord), scoring, AI,
+ * rilevatori personalizzati, allarmi. Tutto configurabile dalla UI.
  */
 
 require('dotenv').config();
@@ -10,35 +11,31 @@ const http = require('http');
 const express = require('express');
 const { WebSocketServer } = require('ws');
 
+const cfg = require('./config');
 const { ScoreEngine, levelFor } = require('./scoring');
 const { AIClassifier } = require('./ai');
 const { WhisperClient } = require('./audio/whisperClient');
 const { TikTokSource } = require('./sources/tiktok');
-const { initDiscord, isDiscordReady, listGuilds, DiscordSource } = require('./sources/discordSource');
+const { initDiscord, shutdownDiscord, isDiscordReady, listGuilds, DiscordSource } = require('./sources/discordSource');
 
-const PORT = Number(process.env.PORT || 3900);
-const AUDIO_ENABLED = String(process.env.AUDIO_ENABLED || 'true') === 'true';
-const CHUNK_SEC = Number(process.env.AUDIO_CHUNK_SEC || 8);
-const ALERT_THRESHOLD = 70;
+const PORT = cfg.get('PORT');
 
 const app = express();
 app.use(express.json());
 
-// --- Basic Auth (per deploy pubblico su VPS: imposta DASH_PASSWORD nel .env) ---
-const DASH_PASSWORD = process.env.DASH_PASSWORD || '';
+// ---------- Basic Auth (password modificabile dalla UI) ----------
 function checkAuth(headerValue) {
-  if (!DASH_PASSWORD) return true;
+  const pw = cfg.get('DASH_PASSWORD');
+  if (!pw) return true;
   if (!headerValue || !headerValue.startsWith('Basic ')) return false;
   const decoded = Buffer.from(headerValue.slice(6), 'base64').toString();
-  return decoded === `barcello:${DASH_PASSWORD}`;
+  return decoded === `barcello:${pw}`;
 }
-if (DASH_PASSWORD) {
-  app.use((req, res, next) => {
-    if (checkAuth(req.headers.authorization)) return next();
-    res.set('WWW-Authenticate', 'Basic realm="Barcellometro"');
-    res.status(401).send('Autenticazione richiesta');
-  });
-}
+app.use((req, res, next) => {
+  if (checkAuth(req.headers.authorization)) return next();
+  res.set('WWW-Authenticate', 'Basic realm="Barcellometro"');
+  res.status(401).send('Autenticazione richiesta');
+});
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -49,16 +46,16 @@ const wss = new WebSocketServer({
   verifyClient: (info) => checkAuth(info.req.headers.authorization),
 });
 
-const whisper = new WhisperClient(process.env.WHISPER_URL);
+const whisper = new WhisperClient(cfg.get('WHISPER_URL'));
 const ai = new AIClassifier({
-  provider: process.env.AI_PROVIDER || undefined,
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  model: process.env.AI_MODEL || undefined,
-  triggerScore: Number(process.env.AI_TRIGGER_SCORE || 40),
-  cooldownSec: Number(process.env.AI_COOLDOWN_SEC || 90),
+  provider: cfg.get('AI_PROVIDER'),
+  apiKey: cfg.get('ANTHROPIC_API_KEY'),
+  model: cfg.get('AI_MODEL') || undefined,
+  triggerScore: cfg.get('AI_TRIGGER_SCORE'),
+  cooldownSec: cfg.get('AI_COOLDOWN_SEC'),
 });
 
-/** sources: id -> { id, platform, name, engine, impl, viewers, audioActive, startedAt } */
+/** sources: id -> { id, platform, name, engine, impl, viewers, audioActive, startedAt, lastWatcherCheck, watcherFired } */
 const sources = new Map();
 let nextId = 1;
 let prevGlobal = 0;
@@ -90,8 +87,11 @@ function snapshot() {
     })),
     global: globalScore(),
     whisper: { available: whisper.available, model: whisper.model },
-    ai: { enabled: ai.enabled, model: ai.enabled ? ai.model : null },
+    ai: { enabled: ai.enabled, provider: ai.provider, model: ai.enabled ? ai.model : null },
     discordReady: isDiscordReady(),
+    watchers: cfg.get('WATCHERS'),
+    interventions: cfg.get('INTERVENTIONS'),
+    version: require('../package.json').version,
   };
 }
 
@@ -115,7 +115,7 @@ function emitEvent(src, kind, user, text, result) {
     notes: result?.notes || [],
   };
   broadcast('event', { event: ev });
-  if (ev.points > 0 || kind === 'ai' || kind === 'system') logEvent(ev);
+  if (ev.points > 0 || ['ai', 'system', 'watcher'].includes(kind)) logEvent(ev);
 }
 
 function makeCallbacks(getSrc) {
@@ -160,6 +160,67 @@ async function maybeAI(src) {
   emitEvent(src, 'ai', 'Claude', txt, { points: verdict.barcello ? verdict.intensita : 0, matches: [], notes: [] });
 }
 
+// ---------- Rilevatori personalizzati (watchers) + interventi bot ----------
+let watcherBusy = false;
+let lastWatcherTick = 0;
+
+async function watcherLoop() {
+  if (Date.now() - lastWatcherTick < cfg.get('WATCHER_INTERVAL_SEC') * 1000) return;
+  if (watcherBusy || !ai.enabled) return;
+  const watchers = (cfg.get('WATCHERS') || []).filter(w => w.enabled);
+  const interventions = (cfg.get('INTERVENTIONS') || []).filter(w => w.enabled);
+  if (!watchers.length && !interventions.length) return;
+  lastWatcherTick = Date.now();
+  watcherBusy = true;
+  try {
+    const wCooldown = cfg.get('WATCHER_COOLDOWN_SEC') * 1000;
+    const iCooldown = cfg.get('INTERVENTION_COOLDOWN_SEC') * 1000;
+    for (const src of sources.values()) {
+      const lastMsg = src.engine.recent[src.engine.recent.length - 1];
+      if (!lastMsg || lastMsg.ts <= (src.lastWatcherCheck || 0)) continue; // niente di nuovo
+      src.lastWatcherCheck = Date.now();
+      src.watcherFired = src.watcherFired || new Map();
+
+      // Condizioni da verificare: watcher (tutte le sorgenti) + interventi (solo Discord)
+      const dueW = watchers.filter(w => Date.now() - (src.watcherFired.get(w.id) || 0) > wCooldown);
+      const dueI = src.platform === 'discord'
+        ? interventions.filter(w => Date.now() - (src.watcherFired.get(w.id) || 0) > iCooldown)
+        : [];
+      const conditions = [...dueW, ...dueI];
+      if (!conditions.length) continue;
+
+      const context = `SCORE BARCELLO ATTUALE: ${src.engine.score}/100\n` + src.engine.contextForAI(30);
+      const results = await ai.checkWatchers(context, conditions, `${src.platform}:${src.name}`);
+      if (!results) continue;
+
+      for (const r of results) {
+        if (!r.match) continue;
+        const w = conditions.find(x => x.id === r.id);
+        if (!w) continue;
+        src.watcherFired.set(w.id, Date.now());
+
+        if (dueI.includes(w)) {
+          // Intervento bot Discord (chat e/o voce)
+          const text = w.reply || await ai.generateIntervention(context, w, src.name)
+            || `Attenzione: rilevato "${w.name}". Il Barcellometro vi tiene d'occhio.`;
+          const done = await src.impl.intervene(w.mode, text, cfg.get('TTS_VOICE'));
+          const via = [done.chat ? 'chat' : null, done.voice ? 'voce' : null].filter(Boolean).join('+') || 'fallito';
+          emitEvent(src, 'bot', `🤖 ${w.name} (${via})`, text, { points: 0, matches: [], notes: [r.evidenza].filter(Boolean) });
+        } else {
+          // Notifica watcher
+          emitEvent(src, 'watcher', `🔔 ${w.name}`, r.evidenza || w.prompt, { points: 0, matches: [], notes: [] });
+          broadcast('watcherAlert', { sourceName: src.name, platform: src.platform, watcher: w.name, evidenza: r.evidenza });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[watchers]', err.message);
+  } finally {
+    watcherBusy = false;
+  }
+}
+setInterval(() => { watcherLoop(); }, 5000);
+
 // ---------- Gestione sorgenti ----------
 async function addTikTok(username) {
   const id = `tt${nextId++}`;
@@ -170,9 +231,9 @@ async function addTikTok(username) {
   };
   const cb = makeCallbacks(() => sources.get(id));
   src.impl = new TikTokSource(username, {
-    signApiKey: process.env.TIKTOK_SIGN_API_KEY || undefined,
-    audioEnabled: AUDIO_ENABLED,
-    chunkSec: CHUNK_SEC,
+    signApiKey: cfg.get('TIKTOK_SIGN_API_KEY') || undefined,
+    audioEnabled: cfg.get('AUDIO_ENABLED'),
+    chunkSec: cfg.get('AUDIO_CHUNK_SEC'),
     whisper,
     ...cb,
   });
@@ -191,12 +252,12 @@ function friendlyTikTokError(err) {
   const m = String(err?.message || err);
   if (/offline|not.*live|UserOffline/i.test(m)) return 'L’utente non e’ in live adesso';
   if (/not.*found|user.*exist/i.test(m)) return 'Username TikTok non trovato';
-  if (/rate|429|limit/i.test(m)) return 'Rate limit del sign server: riprova tra qualche minuto (o aggiungi TIKTOK_SIGN_API_KEY)';
+  if (/rate|429|limit/i.test(m)) return 'Rate limit del sign server: riprova tra qualche minuto (o imposta la API key Euler nelle Impostazioni)';
   return m.slice(0, 200);
 }
 
 async function addDiscord({ guildId, textChannelIds, voiceChannelId }) {
-  if (!isDiscordReady()) throw new Error('Bot Discord non configurato: aggiungi DISCORD_BOT_TOKEN nel file .env');
+  if (!isDiscordReady()) throw new Error('Bot Discord non configurato: imposta il token nelle Impostazioni ⚙️');
   const id = `dc${nextId++}`;
   const guilds = listGuilds();
   const g = guilds.find(x => x.id === guildId);
@@ -235,7 +296,7 @@ function removeSource(id, reason) {
   return true;
 }
 
-// ---------- API ----------
+// ---------- API sorgenti ----------
 app.get('/api/state', (req, res) => res.json(snapshot()));
 
 app.post('/api/sources/tiktok', async (req, res) => {
@@ -271,6 +332,156 @@ app.get('/api/discord/guilds', (req, res) => {
   res.json({ ready: true, guilds: listGuilds() });
 });
 
+// ---------- API impostazioni ----------
+app.get('/api/settings', (req, res) => {
+  res.json({ settings: cfg.forUI(), restartKeys: cfg.RESTART_KEYS });
+});
+
+app.post('/api/settings', async (req, res) => {
+  const oldToken = cfg.get('DISCORD_BOT_TOKEN');
+  const oldWhisperModel = cfg.get('WHISPER_MODEL');
+  const result = cfg.save(req.body || {});
+  const applied = [];
+
+  // AI a caldo
+  if (['AI_PROVIDER', 'AI_MODEL', 'ANTHROPIC_API_KEY', 'AI_TRIGGER_SCORE', 'AI_COOLDOWN_SEC'].some(k => result.changed.includes(k))) {
+    ai.reconfigure({
+      provider: cfg.get('AI_PROVIDER'),
+      apiKey: cfg.get('ANTHROPIC_API_KEY'),
+      model: cfg.get('AI_MODEL') || undefined,
+      triggerScore: cfg.get('AI_TRIGGER_SCORE'),
+      cooldownSec: cfg.get('AI_COOLDOWN_SEC'),
+    });
+    await ai.checkCli();
+    applied.push('AI riconfigurata');
+  }
+
+  // Discord a caldo
+  if (result.changed.includes('DISCORD_BOT_TOKEN')) {
+    const newToken = cfg.get('DISCORD_BOT_TOKEN');
+    if (oldToken !== newToken) {
+      for (const s of [...sources.values()].filter(x => x.platform === 'discord')) {
+        removeSource(s.id, 'cambio token Discord');
+      }
+      await shutdownDiscord();
+      if (newToken) {
+        try {
+          await initDiscord(newToken);
+          applied.push('Bot Discord connesso');
+        } catch (err) {
+          applied.push(`Discord: token non valido (${err.message.slice(0, 80)})`);
+        }
+      } else {
+        applied.push('Bot Discord disattivato');
+      }
+    }
+  }
+
+  // Whisper a caldo
+  if (result.changed.includes('WHISPER_MODEL') && cfg.get('WHISPER_MODEL') !== oldWhisperModel) {
+    const r = await whisper.reload(cfg.get('WHISPER_MODEL'));
+    applied.push(r ? `Whisper ricaricato (${cfg.get('WHISPER_MODEL')})` : 'Whisper: reload fallito (sidecar spento?)');
+  }
+  if (result.changed.includes('DASH_PASSWORD')) applied.push('Password aggiornata (ricarica la pagina)');
+
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, changed: result.changed, needsRestart: result.needsRestart, applied });
+});
+
+app.post('/api/settings/test-ai', async (req, res) => {
+  await ai.checkCli();
+  if (!ai.enabled) return res.json({ ok: false, error: ai.provider === 'claude-sdk' ? 'CLI claude non disponibile o non autenticata' : 'API key mancante' });
+  const t0 = Date.now();
+  const fake = { sourceId: '_test', lastAiCall: 0, contextForAI: () => 'utente1: ma stai zitto buffone\nutente2: vergognati, sei ridicolo\nutente1: ci vediamo fuori', score: 100 };
+  const verdict = await ai.classify(fake, 'test');
+  if (!verdict) return res.json({ ok: false, error: 'nessuna risposta dal modello' });
+  res.json({ ok: true, ms: Date.now() - t0, verdict });
+});
+
+// ---------- API watchers (rilevatori personalizzati) ----------
+app.post('/api/watchers', (req, res) => {
+  const list = cfg.get('WATCHERS') || [];
+  const { name, prompt } = req.body || {};
+  if (!prompt || !String(prompt).trim()) return res.status(400).json({ error: 'Descrivi cosa rilevare' });
+  list.push({ id: `w${Date.now()}`, name: String(name || '').trim() || 'Rilevatore', prompt: String(prompt).trim(), enabled: true });
+  cfg.save({ WATCHERS: list });
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, watchers: cfg.get('WATCHERS') });
+});
+
+app.patch('/api/watchers/:id', (req, res) => {
+  const list = (cfg.get('WATCHERS') || []).map(w => w.id === req.params.id
+    ? { ...w, ...(req.body?.enabled !== undefined ? { enabled: Boolean(req.body.enabled) } : {}), ...(req.body?.name ? { name: String(req.body.name) } : {}), ...(req.body?.prompt ? { prompt: String(req.body.prompt) } : {}) }
+    : w);
+  cfg.save({ WATCHERS: list });
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, watchers: cfg.get('WATCHERS') });
+});
+
+app.delete('/api/watchers/:id', (req, res) => {
+  const list = (cfg.get('WATCHERS') || []).filter(w => w.id !== req.params.id);
+  cfg.save({ WATCHERS: list });
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, watchers: cfg.get('WATCHERS') });
+});
+
+// ---------- API interventi bot Discord ----------
+app.post('/api/interventions', (req, res) => {
+  const list = cfg.get('INTERVENTIONS') || [];
+  const { name, prompt, mode, reply } = req.body || {};
+  if (!prompt || !String(prompt).trim()) return res.status(400).json({ error: 'Descrivi il criterio di intervento' });
+  list.push({
+    id: `i${Date.now()}`,
+    name: String(name || '').trim() || 'Intervento',
+    prompt: String(prompt).trim(),
+    mode: ['chat', 'voice', 'both'].includes(mode) ? mode : 'chat',
+    reply: String(reply || '').trim(),
+    enabled: true,
+  });
+  cfg.save({ INTERVENTIONS: list });
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, interventions: cfg.get('INTERVENTIONS') });
+});
+
+app.patch('/api/interventions/:id', (req, res) => {
+  const list = (cfg.get('INTERVENTIONS') || []).map(w => w.id === req.params.id
+    ? {
+      ...w,
+      ...(req.body?.enabled !== undefined ? { enabled: Boolean(req.body.enabled) } : {}),
+      ...(req.body?.name ? { name: String(req.body.name) } : {}),
+      ...(req.body?.prompt ? { prompt: String(req.body.prompt) } : {}),
+      ...(req.body?.mode ? { mode: String(req.body.mode) } : {}),
+      ...(req.body?.reply !== undefined ? { reply: String(req.body.reply) } : {}),
+    }
+    : w);
+  cfg.save({ INTERVENTIONS: list });
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, interventions: cfg.get('INTERVENTIONS') });
+});
+
+app.delete('/api/interventions/:id', (req, res) => {
+  const list = (cfg.get('INTERVENTIONS') || []).filter(w => w.id !== req.params.id);
+  cfg.save({ INTERVENTIONS: list });
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, interventions: cfg.get('INTERVENTIONS') });
+});
+
+// Test rapido intervento (invia subito nel server Discord selezionato)
+app.post('/api/interventions/test', async (req, res) => {
+  const { sourceId, mode, text } = req.body || {};
+  const src = sources.get(sourceId);
+  if (!src || src.platform !== 'discord') return res.status(400).json({ error: 'Seleziona una sorgente Discord attiva' });
+  const done = await src.impl.intervene(mode || 'chat', text || 'Test del Barcellometro: sistema di intervento operativo. 🍿', cfg.get('TTS_VOICE'));
+  res.json({ ok: done.chat || done.voice, done });
+});
+
+// ---------- Riavvio dalla UI (systemd rilancia il processo) ----------
+app.post('/api/restart', (req, res) => {
+  res.json({ ok: true });
+  broadcast('event', { event: { ts: Date.now(), sourceId: '_sys', sourceName: 'sistema', platform: 'sys', kind: 'system', user: 'sistema', text: 'Riavvio del server...', points: 0, matches: [], notes: [] } });
+  setTimeout(() => process.exit(1), 500);
+});
+
 // ---------- Tick: score, allarmi, health ----------
 setInterval(() => {
   if (sources.size === 0 && wss.clients.size === 0) return;
@@ -282,7 +493,8 @@ setInterval(() => {
   broadcast('scores', { scores, global, globalLevel: levelFor(global) });
 
   const now = Date.now();
-  if (global >= ALERT_THRESHOLD && prevGlobal < ALERT_THRESHOLD && now - lastAlertAt > 60000) {
+  const threshold = cfg.get('ALERT_THRESHOLD');
+  if (global >= threshold && prevGlobal < threshold && now - lastAlertAt > 60000) {
     lastAlertAt = now;
     const top = [...sources.values()].sort((a, b) => b.engine.score - a.engine.score)[0];
     broadcast('alert', { global, sourceName: top ? top.name : '?', platform: top ? top.platform : '?' });
@@ -296,7 +508,7 @@ setInterval(() => { whisper.checkHealth(); }, 30000);
 // ---------- Avvio ----------
 (async () => {
   console.log('===========================================');
-  console.log('   BARCELLOMETRO v1.0');
+  console.log(`   BARCELLOMETRO v${require('../package.json').version}`);
   console.log('===========================================');
 
   await whisper.checkHealth();
@@ -306,16 +518,17 @@ setInterval(() => { whisper.checkHealth(); }, 30000);
     ? `ATTIVO via ${ai.provider === 'claude-sdk' ? 'Claude SDK/subscription' : 'Anthropic API'} (${ai.model})`
     : (ai.provider === 'claude-sdk' ? 'SPENTO (CLI claude non trovata/loggata)' : 'SPENTO (nessuna ANTHROPIC_API_KEY)');
   console.log(`[ai] Classificatore Claude: ${aiStatus}`);
-  if (DASH_PASSWORD) console.log('[auth] Basic Auth attiva (utente: barcello)');
+  if (cfg.get('DASH_PASSWORD')) console.log('[auth] Basic Auth attiva (utente: barcello)');
 
-  if (process.env.DISCORD_BOT_TOKEN) {
+  const token = cfg.get('DISCORD_BOT_TOKEN');
+  if (token) {
     try {
-      await initDiscord(process.env.DISCORD_BOT_TOKEN);
+      await initDiscord(token);
     } catch (err) {
       console.error('[discord] login fallito:', err.message);
     }
   } else {
-    console.log('[discord] Nessun DISCORD_BOT_TOKEN: monitoraggio Discord disattivato');
+    console.log('[discord] Nessun token: configuralo dalla UI (⚙️ Impostazioni)');
   }
 
   server.listen(PORT, () => {
