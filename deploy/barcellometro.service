@@ -1,0 +1,16 @@
+[Unit]
+Description=Barcellometro - rilevatore di barcello (dashboard + sorgenti)
+After=network-online.target barcellometro-whisper.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/barcellometro
+EnvironmentFile=/opt/barcellometro/.env
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target

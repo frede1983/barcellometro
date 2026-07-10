@@ -1,0 +1,15 @@
+[Unit]
+Description=Barcellometro - Whisper sidecar (trascrizione audio)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/barcellometro/whisper
+EnvironmentFile=/opt/barcellometro/.env
+ExecStart=/usr/bin/python3 server.py
+Restart=on-failure
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target

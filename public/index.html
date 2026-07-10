@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐹 Barcellometro</title>
+<link rel="icon" href="avatar.jpg">
+<style>
+  :root {
+    --bg: #150812; --panel: #1f0c1a; --panel2: #2a1023; --border: #47183a;
+    --text: #f5eaf2; --muted: #b183a5;
+    --green: #3ddc84; --yellow: #ffd24a; --orange: #ff8c3a; --red: #ff3b4e;
+    --accent: #ff1fb0; --accent2: #ff5cd0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+  body.alerting { animation: bgflash 0.8s ease-in-out 4; }
+  @keyframes bgflash { 50% { background: #45092e; } }
+
+  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; border-bottom: 2px solid var(--accent); flex-wrap: wrap; gap: 10px; background: linear-gradient(180deg, #2a0d21, var(--bg)); }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand img { width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--accent); box-shadow: 0 0 14px rgba(255,31,176,0.55); }
+  header h1 { font-size: 1.5rem; letter-spacing: 1px; }
+  header h1 span { color: var(--accent); text-shadow: 0 0 12px rgba(255,31,176,0.6); }
+  .brand small { display: block; font-size: 0.68rem; color: var(--muted); font-weight: 400; letter-spacing: 0.5px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); color: var(--muted); }
+  .chip.on { color: var(--green); border-color: var(--green); }
+  .chip.off { color: var(--muted); }
+  .chip.btn { cursor: pointer; user-select: none; }
+  .chip.btn:hover { border-color: var(--text); color: var(--text); }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: 400px 1fr; gap: 20px; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+  .panel h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 14px; }
+
+  /* GAUGE */
+  #gaugeWrap { text-align: center; }
+  #gaugeLevel { font-size: 1.25rem; font-weight: 700; margin-top: -8px; min-height: 1.8rem; }
+  #gaugeScore { font-size: 2.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #gaugeScore small { font-size: 1.1rem; color: var(--muted); }
+
+  /* FORMS */
+  .addrow { display: flex; gap: 8px; margin-bottom: 10px; }
+  input, select, button { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 0.9rem; }
+  input:focus, select:focus { outline: 1px solid var(--accent); }
+  input { flex: 1; min-width: 0; }
+  select { flex: 1; min-width: 0; }
+  button { cursor: pointer; background: var(--accent); border: none; font-weight: 700; white-space: nowrap; }
+  button:hover { filter: brightness(1.15); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .err { color: var(--red); font-size: 0.8rem; min-height: 1rem; margin-bottom: 6px; }
+
+  /* SOURCE CARDS */
+  .src { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .src .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .src .name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .src .meta { font-size: 0.72rem; color: var(--muted); margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .badge { font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+  .badge.tiktok { background: #3a0e2c; color: var(--accent2); }
+  .badge.discord { background: #1a2035; color: #7289da; }
+  .badge.audio { background: #10261a; color: var(--green); }
+  .srcbar { height: 8px; background: #180a14; border-radius: 4px; margin-top: 10px; overflow: hidden; }
+  .srcbar i { display: block; height: 100%; border-radius: 4px; transition: width 0.5s, background 0.5s; }
+  .src .rm { background: none; border: none; color: var(--muted); font-size: 1.1rem; padding: 0 4px; }
+  .src .rm:hover { color: var(--red); }
+  .srcscore { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+  /* FEED */
+  #feed { max-height: 520px; overflow-y: auto; display: flex; flex-direction: column-reverse; gap: 6px; }
+  .ev { padding: 8px 10px; border-radius: 8px; background: var(--panel2); border-left: 3px solid var(--border); font-size: 0.85rem; }
+  .ev .who { font-weight: 700; }
+  .ev .src-tag { color: var(--muted); font-size: 0.7rem; }
+  .ev .pts { float: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .ev .kws { margin-top: 3px; font-size: 0.7rem; color: var(--orange); }
+  .ev.p1 { border-left-color: var(--yellow); }
+  .ev.p2 { border-left-color: var(--orange); }
+  .ev.p3 { border-left-color: var(--red); background: #2d0f22; }
+  .ev.kind-audio { border-style: solid; }
+  .ev.kind-audio .who::before { content: "🎙 "; }
+  .ev.kind-ai { border-left-color: #9b6dff; background: #191327; }
+  .ev.kind-ai .who::before { content: "🤖 "; }
+  .ev.kind-system { color: var(--muted); font-style: italic; }
+  mark { background: #4a1238; color: #ff9bdc; border-radius: 3px; padding: 0 2px; }
+
+  #timeline { width: 100%; height: 110px; background: var(--panel2); border-radius: 8px; }
+  .col { display: flex; flex-direction: column; gap: 20px; }
+
+  /* ALERT */
+  #alertBox { position: fixed; top: 18px; left: 50%; transform: translateX(-50%) scale(0); background: linear-gradient(135deg, #ff1fb0, #ff3b4e); color: #fff; padding: 16px 30px; border-radius: 14px; font-weight: 800; font-size: 1.2rem; z-index: 99; box-shadow: 0 8px 40px rgba(255,31,176,0.55); transition: transform 0.25s; text-align: center; }
+  #alertBox.show { transform: translateX(-50%) scale(1); }
+  #alertBox small { display: block; font-weight: 400; font-size: 0.8rem; opacity: 0.9; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <img src="avatar.jpg" alt="cricetomannaro000">
+    <h1>BARCELLO<span>METRO</span><small>edizione @cricetomannaro000 🐹🍿</small></h1>
+  </div>
+  <div class="chips">
+    <span id="chipWs" class="chip off">● server</span>
+    <span id="chipAudio" class="chip off">🎙 audio</span>
+    <span id="chipAi" class="chip off">🤖 AI</span>
+    <span id="chipMute" class="chip btn" onclick="toggleMute()">🔊 allarme</span>
+  </div>
+</header>
+
+<div id="alertBox">🚨 BARCELLO RILEVATO! 🚨<small id="alertSrc"></small></div>
+
+<main>
+  <div class="col">
+    <div class="panel" id="gaugeWrap">
+      <svg id="gauge" viewBox="0 0 300 175" width="100%">
+        <defs>
+          <linearGradient id="ggrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#3ddc84"/>
+            <stop offset="40%" stop-color="#ffd24a"/>
+            <stop offset="70%" stop-color="#ff8c3a"/>
+            <stop offset="100%" stop-color="#ff3b4e"/>
+          </linearGradient>
+        </defs>
+        <path d="M 30 160 A 120 120 0 0 1 270 160" fill="none" stroke="#22242e" stroke-width="26" stroke-linecap="round"/>
+        <path id="gaugeArc" d="M 30 160 A 120 120 0 0 1 270 160" fill="none" stroke="url(#ggrad)" stroke-width="26" stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="377"/>
+        <g id="needle" transform="rotate(-90 150 160)">
+          <line x1="150" y1="160" x2="150" y2="58" stroke="#e8e9ee" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="150" cy="160" r="10" fill="#e8e9ee"/>
+        </g>
+      </svg>
+      <div id="gaugeScore">0<small>/100</small></div>
+      <div id="gaugeLevel" style="color:var(--green)">💤 Quiete piatta</div>
+      <canvas id="timeline" style="margin-top:14px"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>➕ Aggiungi live TikTok</h2>
+      <div class="addrow">
+        <input id="ttUser" value="cricetomannaro000" placeholder="@username (deve essere in live)" onkeydown="if(event.key==='Enter')addTikTok()">
+        <button id="ttBtn" onclick="addTikTok()">Monitora</button>
+      </div>
+      <div class="err" id="ttErr"></div>
+
+      <h2 style="margin-top:8px">➕ Aggiungi Discord</h2>
+      <div id="dcForms">
+        <div class="addrow"><select id="dcGuild" onchange="fillChannels()"><option>Caricamento...</option></select></div>
+        <div class="addrow"><select id="dcVoice"><option value="">🔇 Nessun canale vocale (solo chat)</option></select></div>
+        <div class="addrow"><button id="dcBtn" onclick="addDiscord()" style="flex:1">Monitora server</button></div>
+      </div>
+      <div class="err" id="dcErr"></div>
+    </div>
+
+    <div class="panel">
+      <h2>📡 Sorgenti monitorate</h2>
+      <div id="srcList"><div style="color:var(--muted);font-size:0.85rem">Nessuna sorgente attiva. Aggiungi una live TikTok o un server Discord.</div></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <h2>🔥 Feed del barcello</h2>
+      <div id="feed"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let muted = localStorage.getItem('bm_mute') === '1';
+let sourcesCache = [];
+let history = []; // {t, score}
+updateMuteChip();
+
+// ---------- WebSocket ----------
+let ws;
+function connectWS() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => setChip('chipWs', true, '● server');
+  ws.onclose = () => { setChip('chipWs', false, '● server'); setTimeout(connectWS, 2000); };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'snapshot') applySnapshot(msg);
+    else if (msg.type === 'scores') applyScores(msg);
+    else if (msg.type === 'event') addFeedEvent(msg.event);
+    else if (msg.type === 'alert') fireAlert(msg);
+  };
+}
+connectWS();
+
+function setChip(id, on, label) {
+  const c = $(id);
+  c.className = 'chip ' + (on ? 'on' : 'off');
+  c.textContent = label;
+}
+
+function applySnapshot(s) {
+  sourcesCache = s.sources;
+  setChip('chipAudio', s.whisper.available, s.whisper.available ? `🎙 audio (${s.whisper.model})` : '🎙 audio off');
+  setChip('chipAi', s.ai.enabled, s.ai.enabled ? '🤖 AI attiva' : '🤖 AI off');
+  renderSources();
+  setGauge(s.global);
+  if (s.discordReady) loadGuilds();
+  else {
+    $('dcForms').innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Bot non configurato: aggiungi DISCORD_BOT_TOKEN nel file .env e riavvia.</div>';
+  }
+}
+
+function applyScores(m) {
+  for (const sc of m.scores) {
+    const s = sourcesCache.find(x => x.id === sc.id);
+    if (s) Object.assign(s, sc);
+  }
+  renderSources();
+  setGauge(m.global, m.globalLevel);
+  history.push({ t: Date.now(), score: m.global });
+  history = history.filter(h => Date.now() - h.t < 600000);
+  drawTimeline();
+}
+
+// ---------- Gauge ----------
+function colorFor(score) {
+  if (score >= 80) return 'var(--red)';
+  if (score >= 60) return 'var(--orange)';
+  if (score >= 40) return '#ffb03a';
+  if (score >= 20) return 'var(--yellow)';
+  return 'var(--green)';
+}
+function setGauge(score, level) {
+  const arc = $('gaugeArc');
+  arc.style.strokeDashoffset = 377 - (377 * score / 100);
+  $('needle').setAttribute('transform', `rotate(${-90 + 180 * score / 100} 150 160)`);
+  $('gaugeScore').innerHTML = `${score}<small>/100</small>`;
+  const lvl = level || levelFor(score);
+  const el = $('gaugeLevel');
+  el.textContent = `${lvl.emoji} ${lvl.name}`;
+  el.style.color = colorFor(score);
+}
+function levelFor(score) {
+  if (score >= 80) return { name: 'BARCELLO TOTALE', emoji: '🔥🍿' };
+  if (score >= 60) return { name: 'BARCELLO!', emoji: '🥊' };
+  if (score >= 40) return { name: 'Frizione rilevata', emoji: '⚠️' };
+  if (score >= 20) return { name: "Tensione nell'aria", emoji: '👀' };
+  return { name: 'Quiete piatta', emoji: '💤' };
+}
+
+// ---------- Timeline ----------
+function drawTimeline() {
+  const cv = $('timeline');
+  const w = cv.width = cv.clientWidth * 2;
+  const h = cv.height = 220;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = '#2a2e3a';
+  [25, 50, 75].forEach(p => {
+    ctx.beginPath(); ctx.moveTo(0, h - h * p / 100); ctx.lineTo(w, h - h * p / 100); ctx.stroke();
+  });
+  if (history.length < 2) return;
+  const t0 = Date.now() - 600000;
+  ctx.beginPath();
+  ctx.strokeStyle = '#ff1fb0'; ctx.lineWidth = 3;
+  history.forEach((pt, i) => {
+    const x = ((pt.t - t0) / 600000) * w;
+    const y = h - (pt.score / 100) * (h - 10) - 5;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+// ---------- Sorgenti ----------
+function renderSources() {
+  const box = $('srcList');
+  if (!sourcesCache.length) {
+    box.innerHTML = '<div style="color:var(--muted);font-size:0.85rem">Nessuna sorgente attiva. Aggiungi una live TikTok o un server Discord.</div>';
+    return;
+  }
+  box.innerHTML = sourcesCache.map(s => `
+    <div class="src">
+      <div class="top">
+        <div style="min-width:0">
+          <span class="badge ${s.platform}">${s.platform === 'tiktok' ? 'TIKTOK' : 'DISCORD'}</span>
+          <span class="name">${esc(s.name)}</span>
+        </div>
+        <div>
+          <span class="srcscore" style="color:${colorFor(s.score)}">${s.score}</span>
+          <button class="rm" title="Rimuovi" onclick="removeSource('${s.id}')">✕</button>
+        </div>
+      </div>
+      <div class="meta">
+        ${s.viewers != null ? `<span>👁 ${s.viewers}</span>` : ''}
+        ${s.audioActive ? '<span class="badge audio">🎙 AUDIO</span>' : '<span>solo chat</span>'}
+        <span>${(levelFor(s.score)).emoji} ${(levelFor(s.score)).name}</span>
+      </div>
+      <div class="srcbar"><i style="width:${s.score}%;background:${colorFor(s.score)}"></i></div>
+    </div>`).join('');
+}
+
+async function addTikTok() {
+  const u = $('ttUser').value.trim();
+  $('ttErr').textContent = '';
+  if (!u) return;
+  $('ttBtn').disabled = true; $('ttBtn').textContent = '...';
+  try {
+    const r = await fetch('/api/sources/tiktok', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: u }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    $('ttUser').value = '';
+  } catch (err) { $('ttErr').textContent = err.message; }
+  $('ttBtn').disabled = false; $('ttBtn').textContent = 'Monitora';
+}
+
+let guildsData = [];
+async function loadGuilds() {
+  try {
+    const r = await fetch('/api/discord/guilds');
+    const d = await r.json();
+    if (!d.ready) return;
+    guildsData = d.guilds;
+    const sel = $('dcGuild');
+    if (!sel) return;
+    sel.innerHTML = guildsData.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('') || '<option value="">Nessun server (invita il bot)</option>';
+    fillChannels();
+  } catch { /* ignore */ }
+}
+function fillChannels() {
+  const g = guildsData.find(x => x.id === $('dcGuild').value);
+  const v = $('dcVoice');
+  v.innerHTML = '<option value="">🔇 Nessun canale vocale (solo chat)</option>' +
+    (g ? g.voiceChannels.map(c => `<option value="${c.id}">🔊 ${esc(c.name)}</option>`).join('') : '');
+}
+async function addDiscord() {
+  $('dcErr').textContent = '';
+  const guildId = $('dcGuild').value;
+  if (!guildId) { $('dcErr').textContent = 'Seleziona un server'; return; }
+  $('dcBtn').disabled = true;
+  try {
+    const r = await fetch('/api/sources/discord', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ guildId, voiceChannelId: $('dcVoice').value || null }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+  } catch (err) { $('dcErr').textContent = err.message; }
+  $('dcBtn').disabled = false;
+}
+async function removeSource(id) {
+  await fetch(`/api/sources/${id}`, { method: 'DELETE' });
+}
+
+// ---------- Feed ----------
+function esc(s) { return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function addFeedEvent(ev) {
+  const feed = $('feed');
+  const div = document.createElement('div');
+  const p = ev.points || 0;
+  const cls = p >= 15 ? 'p3' : p >= 7 ? 'p2' : p > 0 ? 'p1' : '';
+  div.className = `ev kind-${ev.kind} ${cls}`;
+  let text = esc(ev.text);
+  for (const kw of ev.matches || []) {
+    try {
+      const re = new RegExp(esc(kw).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      text = text.replace(re, m => `<mark>${m}</mark>`);
+    } catch { /* ignore */ }
+  }
+  const time = new Date(ev.ts).toLocaleTimeString('it-IT');
+  div.innerHTML = `
+    ${p > 0 ? `<span class="pts" style="color:${p >= 15 ? 'var(--red)' : p >= 7 ? 'var(--orange)' : 'var(--yellow)'}">+${p}</span>` : ''}
+    <span class="src-tag">[${time} · ${esc(ev.sourceName)}]</span>
+    <span class="who">${esc(ev.user)}:</span> ${text}
+    ${(ev.notes || []).length ? `<div class="kws">⚡ ${ev.notes.map(esc).join(' · ')}</div>` : ''}`;
+  feed.appendChild(div);
+  while (feed.children.length > 200) feed.removeChild(feed.firstChild);
+}
+
+// ---------- Allarme ----------
+let audioCtx;
+function siren() {
+  if (muted) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const g = audioCtx.createGain();
+    g.gain.value = 0.12; g.connect(audioCtx.destination);
+    const o = audioCtx.createOscillator();
+    o.type = 'sawtooth'; o.connect(g);
+    const t = audioCtx.currentTime;
+    for (let i = 0; i < 6; i++) {
+      o.frequency.setValueAtTime(i % 2 ? 620 : 880, t + i * 0.28);
+    }
+    o.start(t); o.stop(t + 1.7);
+    g.gain.setValueAtTime(0.12, t + 1.5);
+    g.gain.linearRampToValueAtTime(0, t + 1.7);
+  } catch { /* ignore */ }
+}
+function fireAlert(m) {
+  $('alertSrc').textContent = `${m.platform}: ${m.sourceName} — livello ${m.global}/100`;
+  $('alertBox').classList.add('show');
+  document.body.classList.add('alerting');
+  siren();
+  if (Notification && Notification.permission === 'granted') {
+    new Notification('🚨 BARCELLO RILEVATO!', { body: `${m.sourceName} — ${m.global}/100 🍿` });
+  }
+  setTimeout(() => { $('alertBox').classList.remove('show'); document.body.classList.remove('alerting'); }, 8000);
+}
+function toggleMute() {
+  muted = !muted;
+  localStorage.setItem('bm_mute', muted ? '1' : '0');
+  updateMuteChip();
+}
+function updateMuteChip() {
+  $('chipMute').textContent = muted ? '🔇 allarme muto' : '🔊 allarme';
+}
+if (window.Notification && Notification.permission === 'default') {
+  setTimeout(() => Notification.requestPermission(), 3000);
+}
+window.addEventListener('resize', drawTimeline);
+</script>
+</body>
+</html>
