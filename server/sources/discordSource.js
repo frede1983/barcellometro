@@ -104,16 +104,107 @@ class DiscordSource {
       if (textIds.size > 0 && !textIds.has(msg.channelId)) return;
       this.lastTextChannelId = msg.channelId;
       const content = msg.content || '';
-      if (content) this.cfg.onChat(msg.author.username, content, `#${msg.channel?.name || '?'}`);
+      const avatar = msg.author.displayAvatarURL ? msg.author.displayAvatarURL({ size: 128 }) : null;
+      if (content) this.cfg.onChat(msg.author.username, content, `#${msg.channel?.name || '?'}`, { avatar, displayName: msg.member?.displayName || null });
     };
     client.on('messageCreate', this.msgHandler);
     this.cfg.onSystem(`Monitoraggio chat attivo su ${this.guild.name}${textIds.size ? ` (${textIds.size} canali)` : ' (tutti i canali)'}`);
+
+    // Traccia l'ultimo messaggio per utente (per delete in moderazione)
+    this.lastMsgByUser = new Map();
+    this.msgTrackHandler = (msg) => {
+      if (msg.guildId !== this.cfg.guildId || msg.author?.bot) return;
+      this.lastMsgByUser.set(msg.author.username.toLowerCase(), { id: msg.id, channelId: msg.channelId, ts: Date.now() });
+      if (this.lastMsgByUser.size > 200) {
+        const oldest = [...this.lastMsgByUser.entries()].sort((a, b) => a[1].ts - b[1].ts)[0];
+        if (oldest) this.lastMsgByUser.delete(oldest[0]);
+      }
+    };
+    client.on('messageCreate', this.msgTrackHandler);
+
+    // --- Registro presenze vocali (join/leave/mute) ---
+    this.voiceStateHandler = (oldS, newS) => {
+      if (newS.guild?.id !== this.cfg.guildId) return;
+      const u = newS.member?.user;
+      if (!u || u.bot) return;
+      const oldCh = oldS.channelId, newCh = newS.channelId;
+      if (oldCh === newCh) return;
+      if (!oldCh && newCh) this.cfg.onVoiceActivity?.(u.username, 'join', newS.channel?.name);
+      else if (oldCh && !newCh) this.cfg.onVoiceActivity?.(u.username, 'leave', oldS.channel?.name);
+      else this.cfg.onVoiceActivity?.(u.username, 'move', newS.channel?.name);
+    };
+    client.on('voiceStateUpdate', this.voiceStateHandler);
 
     // --- Voce ---
     if (this.cfg.voiceChannelId) {
       await this._joinVoice();
     }
     return true;
+  }
+
+  /** Nomi utenti attualmente nel canale vocale monitorato (+ chi ha scritto di recente) */
+  roster() {
+    const names = new Set();
+    try {
+      const vc = this.cfg.voiceChannelId && this.guild.channels.cache.get(this.cfg.voiceChannelId);
+      if (vc?.members) vc.members.forEach(m => { if (!m.user.bot) names.add(m.user.username); });
+    } catch { /* ignore */ }
+    for (const [, v] of (this.lastMsgByUser || new Map())) {
+      if (Date.now() - v.ts < 600000) { /* recente */ }
+    }
+    // aggiungi autori recenti dalla mappa
+    if (this.lastMsgByUser) {
+      for (const key of this.lastMsgByUser.keys()) names.add(key);
+    }
+    return [...names];
+  }
+
+  async _resolveMember(username) {
+    const uname = String(username || '').toLowerCase();
+    let member = this.guild.members.cache.find(m => m.user.username.toLowerCase() === uname || m.displayName?.toLowerCase() === uname);
+    if (!member) {
+      try {
+        const fetched = await this.guild.members.fetch({ query: username, limit: 5 });
+        member = fetched.find(m => m.user.username.toLowerCase() === uname) || fetched.first();
+      } catch { /* ignore */ }
+    }
+    return member || null;
+  }
+
+  /**
+   * Esegue un'azione di moderazione. Ritorna { ok, detail }.
+   */
+  async enforce(action) {
+    const { utente, azione, durataMin } = action;
+    try {
+      if (azione === 'delete') {
+        const ref = this.lastMsgByUser?.get(String(utente).toLowerCase());
+        if (!ref) return { ok: false, detail: 'messaggio non trovato' };
+        const ch = this.guild.channels.cache.get(ref.channelId);
+        const msg = ch && await ch.messages.fetch(ref.id).catch(() => null);
+        if (msg) { await msg.delete(); return { ok: true, detail: 'messaggio cancellato' }; }
+        return { ok: false, detail: 'messaggio non piu’ disponibile' };
+      }
+      const member = await this._resolveMember(utente);
+      if (!member) return { ok: false, detail: 'utente non trovato' };
+      if (azione === 'timeout') {
+        await member.timeout(Math.round(durataMin * 60000), 'Moderazione AI Barcellometro');
+        return { ok: true, detail: `timeout ${durataMin} min` };
+      }
+      if (azione === 'kick') {
+        if (!member.kickable) return { ok: false, detail: 'permessi insufficienti per kick' };
+        await member.kick('Moderazione AI Barcellometro');
+        return { ok: true, detail: 'espulso' };
+      }
+      if (azione === 'ban') {
+        if (!member.bannable) return { ok: false, detail: 'permessi insufficienti per ban' };
+        await member.ban({ reason: 'Moderazione AI Barcellometro' });
+        return { ok: true, detail: 'bandito' };
+      }
+      return { ok: true, detail: azione }; // warn/voice gestiti a monte via intervene()
+    } catch (err) {
+      return { ok: false, detail: err.message.slice(0, 120) };
+    }
   }
 
   async _joinVoice() {
@@ -173,12 +264,13 @@ class DiscordSource {
       if (!whisper || !whisper.available) return;
       const text = await whisper.transcribe(pcm16ToWav(pcm16k, 16000, 1));
       if (!text) return;
-      let name = userId;
+      let name = userId, avatar = null;
       try {
         const user = client.users.cache.get(userId) || await client.users.fetch(userId);
         name = user.username;
+        avatar = user.displayAvatarURL ? user.displayAvatarURL({ size: 128 }) : null;
       } catch { /* ignore */ }
-      this.cfg.onTranscript(name, text, shouted);
+      this.cfg.onTranscript(name, text, shouted, { avatar });
     };
 
     decoder.on('end', finish);
@@ -234,6 +326,8 @@ class DiscordSource {
   async stop() {
     this.stopped = true;
     if (this.msgHandler) client.off('messageCreate', this.msgHandler);
+    if (this.msgTrackHandler) client.off('messageCreate', this.msgTrackHandler);
+    if (this.voiceStateHandler) client.off('voiceStateUpdate', this.voiceStateHandler);
     try { this.audioPlayer?.stop(); } catch { /* ignore */ }
     try { this.voiceConnection?.destroy(); } catch { /* ignore */ }
   }

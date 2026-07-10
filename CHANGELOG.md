@@ -4,6 +4,23 @@ Tutte le modifiche rilevanti del progetto sono documentate in questo file.
 Formato basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/),
 versionamento [SemVer](https://semver.org/lang/it/).
 
+## [1.2.0] - 2026-07-11
+
+🚧 Work in Progress.
+
+### Aggiunto
+- **🛡️ Moderazione AI Discord**: scrivi il regolamento e le conseguenze in linguaggio naturale; l'AI legge chat e vocale e applica le sanzioni consentite (avviso, avviso vocale, cancellazione messaggio, timeout, kick, ban) con permessi Discord reali, cooldown per utente e timeout massimo configurabile
+- **📜 Registro attività Discord** persistente (JSONL): chat, parlato trascritto, entrate/uscite dai canali vocali, azioni bot e moderazione — consultabile e filtrabile dalla UI
+- **👥 Schede profilo** per ogni persona vista (TikTok e Discord) con avatar, primo/ultimo avvistamento, statistiche, cronologia messaggi/audio, host frequentati, donazioni e violazioni subite
+- **⚔️ Match TikTok**: al rilevamento di un match il sistema aggancia automaticamente la live dell'avversario e ne mostra la chat; gli utenti che commentano **avanti e indietro** tra le due chat vengono flaggati (🔀) con boost di score
+- **👁️ Rubrica persone monitorate** con tracking **cross-host**: avviso quando un utente in rubrica compare in una live/server e allerta speciale se va **da un altro host**
+- **🎁 Donazioni TikTok**: rilevamento gift con valore in diamanti, contatore donazioni per live e totale
+- **👑 Classifica "putt"**: punti fedeltà della community calcolati su donazioni, presenza ripetuta e attività, con bonus a chi è fedele a un singolo host
+- Voce del bot in vocale via Edge TTS
+
+### Note
+- Le azioni kick/ban richiedono che il bot abbia i relativi permessi e un ruolo più alto del bersaglio
+
 ## [1.1.0] - 2026-07-11
 
 ### Aggiunto

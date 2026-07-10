@@ -1,6 +1,6 @@
 {
   "name": "barcellometro",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Rilevatore di barcello (litigi e dissing) in tempo reale per live TikTok e Discord - chat + audio",
   "main": "server/index.js",
   "author": "Frederico Mafli <frederico.mafli@gmail.com> (https://github.com/frede1983)",

@@ -33,6 +33,15 @@ const DEFAULTS = {
   INTERVENTIONS: [],
   INTERVENTION_COOLDOWN_SEC: 300,
   TTS_VOICE: 'it-IT-DiegoNeural',
+  // Moderazione AI Discord: regolamento scritto dall'utente, applicato da Claude
+  MODERATION: {
+    enabled: false,
+    rules: '',
+    actions: { warn: true, voice: false, delete: true, timeout: true, kick: false, ban: false },
+    maxTimeoutMin: 10,
+    intervalSec: 45,
+    userCooldownSec: 180,
+  },
 };
 
 // Chiavi il cui nuovo valore richiede riavvio del server
@@ -41,7 +50,7 @@ const RESTART_KEYS = ['PORT'];
 const SECRET_KEYS = ['DASH_PASSWORD', 'ANTHROPIC_API_KEY', 'DISCORD_BOT_TOKEN', 'TIKTOK_SIGN_API_KEY'];
 const NUMERIC_KEYS = ['PORT', 'AI_TRIGGER_SCORE', 'AI_COOLDOWN_SEC', 'ALERT_THRESHOLD', 'AUDIO_CHUNK_SEC', 'WATCHER_INTERVAL_SEC', 'WATCHER_COOLDOWN_SEC', 'INTERVENTION_COOLDOWN_SEC'];
 const BOOL_KEYS = ['AUDIO_ENABLED'];
-const JSON_KEYS = ['WATCHERS', 'INTERVENTIONS'];
+const JSON_KEYS = ['WATCHERS', 'INTERVENTIONS', 'MODERATION'];
 
 /** Sanifica la lista watcher */
 function sanitizeWatchers(list) {
@@ -52,6 +61,27 @@ function sanitizeWatchers(list) {
     prompt: String(w.prompt || '').trim().slice(0, 300),
     enabled: w.enabled !== false,
   })).filter(w => w.prompt);
+}
+
+/** Sanifica la configurazione moderazione */
+function sanitizeModeration(m) {
+  if (!m || typeof m !== 'object') return undefined;
+  const a = m.actions || {};
+  return {
+    enabled: Boolean(m.enabled),
+    rules: String(m.rules || '').slice(0, 4000),
+    actions: {
+      warn: a.warn !== false,
+      voice: Boolean(a.voice),
+      delete: a.delete !== false,
+      timeout: a.timeout !== false,
+      kick: Boolean(a.kick),
+      ban: Boolean(a.ban),
+    },
+    maxTimeoutMin: Math.max(1, Math.min(1440, Number(m.maxTimeoutMin) || 10)),
+    intervalSec: Math.max(20, Math.min(600, Number(m.intervalSec) || 45)),
+    userCooldownSec: Math.max(30, Math.min(3600, Number(m.userCooldownSec) || 180)),
+  };
 }
 
 /** Sanifica la lista interventi bot */
@@ -84,6 +114,7 @@ function coerce(key, val) {
     if (typeof v === 'string') { try { v = JSON.parse(v); } catch { return undefined; } }
     if (key === 'WATCHERS') return sanitizeWatchers(v);
     if (key === 'INTERVENTIONS') return sanitizeInterventions(v);
+    if (key === 'MODERATION') return sanitizeModeration(v);
     return v;
   }
   return String(val);

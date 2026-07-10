@@ -28,18 +28,57 @@ class TikTokSource {
   }
 
   async start() {
-    const options = { fetchRoomInfoOnConnect: true };
+    const options = { fetchRoomInfoOnConnect: true, enableExtendedGiftInfo: true };
     if (this.opts.signApiKey) options.signApiKey = this.opts.signApiKey;
     this.connection = new TikTokLiveConnection(this.username, options);
 
     this.connection.on(WebcastEvent.CHAT, (data) => {
       const user = data.user?.uniqueId || data.user?.nickname || 'anonimo';
-      if (data.comment) this.opts.onChat(user, data.comment);
+      const avatar = data.user?.profilePicture?.urls?.[0] || data.user?.profilePicture?.url?.[0] || null;
+      const displayName = data.user?.nickname || null;
+      if (data.comment) this.opts.onChat(user, data.comment, null, { avatar, displayName });
+    });
+
+    this.connection.on(WebcastEvent.MEMBER, (data) => {
+      const user = data.user?.uniqueId || data.user?.nickname;
+      const avatar = data.user?.profilePicture?.urls?.[0] || null;
+      if (user) this.opts.onJoin?.(user, { avatar, displayName: data.user?.nickname || null });
+    });
+
+    // --- Donazioni (gift) ---
+    this.connection.on(WebcastEvent.GIFT, (data) => {
+      try {
+        const giftType = data.giftDetails?.giftType ?? data.giftType;
+        // Per i gift "streakable" (type 1) conta solo a streak finito
+        if (giftType === 1 && data.repeatEnd === false) return;
+        const user = data.user?.uniqueId || data.user?.nickname || 'anonimo';
+        const avatar = data.user?.profilePicture?.urls?.[0] || null;
+        const repeat = data.repeatCount || 1;
+        const diamonds = (data.giftDetails?.diamondCount ?? data.extendedGiftInfo?.diamond_count ?? 0) * repeat;
+        const giftName = data.giftDetails?.giftName || data.extendedGiftInfo?.name || `gift ${data.giftId || ''}`;
+        this.opts.onGift?.(user, diamonds, giftName, repeat, { avatar, displayName: data.user?.nickname || null });
+      } catch { /* ignore */ }
     });
 
     this.connection.on(WebcastEvent.ROOM_USER, (data) => {
       if (typeof data.viewerCount === 'number') this.opts.onViewers(data.viewerCount);
     });
+
+    // --- Rilevamento MATCH (link mic battle): estrai l'avversario ---
+    const onBattle = (data) => {
+      try {
+        const anchors = data.battleUsers || data.anchorInfo || data.participants || [];
+        const list = Array.isArray(anchors) ? anchors : Object.values(anchors);
+        const names = list
+          .map(a => a?.user?.uniqueId || a?.uniqueId || a?.user?.displayId || a?.user?.nickName || a?.user?.nickname)
+          .filter(Boolean)
+          .map(n => String(n).replace(/^@/, ''));
+        const opponent = names.find(n => n.toLowerCase() !== this.username.toLowerCase());
+        if (opponent) this.opts.onMatch?.(opponent, names);
+      } catch { /* ignore */ }
+    };
+    if (WebcastEvent.LINK_MIC_BATTLE) this.connection.on(WebcastEvent.LINK_MIC_BATTLE, onBattle);
+    if (WebcastEvent.LINK_MIC_ARMIES) this.connection.on(WebcastEvent.LINK_MIC_ARMIES, onBattle);
 
     this.connection.on(WebcastEvent.STREAM_END, () => {
       this.opts.onSystem('La live e’ terminata');

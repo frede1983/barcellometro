@@ -96,11 +96,61 @@
   .ev.kind-ai .who::before { content: "🤖 "; }
   .ev.kind-watcher { border-left-color: var(--accent); background: #2a0d21; }
   .ev.kind-bot { border-left-color: #7289da; background: #141a2b; }
+  .ev.kind-mod { border-left-color: #ff3b4e; background: #2a0d13; }
+  .ev.kind-mod .who::before { content: "🛡️ "; }
+  .ev.kind-gift { border-left-color: var(--accent2); background: #2a0d21; }
+  .ev.kind-watch { border-left-color: var(--yellow); background: #24200d; }
   .ev.kind-system { color: var(--muted); font-style: italic; }
   mark { background: #4a1238; color: #ff9bdc; border-radius: 3px; padding: 0 2px; }
 
   #timeline { width: 100%; height: 110px; background: var(--panel2); border-radius: 8px; }
   .col { display: flex; flex-direction: column; gap: 20px; }
+
+  /* tabs colonna destra */
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab { padding: 7px 14px; border-radius: 20px; background: var(--panel2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 0.82rem; font-weight: 600; }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tabpane { display: none; }
+  .tabpane.active { display: block; }
+
+  /* griglia profili */
+  .ugrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; max-height: 620px; overflow-y: auto; }
+  .ucard { background: var(--panel2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+  .ucard:hover { border-color: var(--accent); }
+  .ucard img, .uava { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; margin: 0 auto 8px; display: block; background: #3a0e2c; border: 2px solid var(--border); }
+  .uava { display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700; color: var(--accent2); }
+  .ucard .un { font-weight: 700; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ucard .us { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+  .ucard .ubadge { display: inline-block; font-size: 0.62rem; padding: 1px 6px; border-radius: 8px; margin-top: 6px; }
+  .ubadge.viol { background: #2a0d13; color: var(--red); }
+  .ubadge.hot { background: #3a1a0e; color: var(--orange); }
+
+  .filters { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filters select, .filters input { flex: 1; min-width: 100px; }
+
+  /* registro */
+  .logrow { display: flex; gap: 8px; padding: 7px 10px; border-radius: 8px; background: var(--panel2); margin-bottom: 5px; font-size: 0.82rem; align-items: baseline; }
+  .logrow .lt { color: var(--muted); font-size: 0.68rem; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .logrow .lk { font-size: 0.62rem; padding: 1px 6px; border-radius: 8px; flex-shrink: 0; font-weight: 700; }
+  .lk.chat { background: #1a2035; color: #7289da; }
+  .lk.voice { background: #10261a; color: var(--green); }
+  .lk.voicepresence { background: #1a1230; color: #9b6dff; }
+  .lk.moderation { background: #2a0d13; color: var(--red); }
+  .lk.bot { background: #141a2b; color: #7fa0ff; }
+  .lk.system { background: #241a20; color: var(--muted); }
+  #logList { max-height: 620px; overflow-y: auto; }
+
+  /* scheda utente (modale) */
+  #userModal .uhead { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
+  #userModal .uhead img, #userModal .uhead .uava { width: 72px; height: 72px; font-size: 1.8rem; }
+  .ustats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+  .ustat { background: var(--panel2); border-radius: 10px; padding: 10px; text-align: center; }
+  .ustat b { display: block; font-size: 1.3rem; color: var(--accent2); }
+  .ustat span { font-size: 0.68rem; color: var(--muted); }
+  .usec { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 14px 0 6px; }
+  .uli { background: var(--panel2); border-radius: 8px; padding: 7px 10px; margin-bottom: 5px; font-size: 0.82rem; }
+  .uli .lt { color: var(--muted); font-size: 0.68rem; }
+  .uli.viol { border-left: 3px solid var(--red); }
 
   #alertBox { position: fixed; top: 18px; left: 50%; transform: translateX(-50%) scale(0); background: linear-gradient(135deg, #ff1fb0, #ff3b4e); color: #fff; padding: 16px 30px; border-radius: 14px; font-weight: 800; font-size: 1.2rem; z-index: 99; box-shadow: 0 8px 40px rgba(255,31,176,0.55); transition: transform 0.25s; text-align: center; }
   #alertBox.show { transform: translateX(-50%) scale(1); }
@@ -163,6 +213,7 @@
       </svg>
       <div id="gaugeScore">0<small>/100</small></div>
       <div id="gaugeLevel" style="color:var(--green)">💤 Quiete piatta</div>
+      <div id="donCounter" style="margin-top:8px;font-size:0.85rem;color:var(--accent2)">💎 0 diamanti donati</div>
       <canvas id="timeline" style="margin-top:14px"></canvas>
     </div>
 
@@ -225,15 +276,113 @@
       </div>
       <div class="err" id="iErr"></div>
     </div>
+
+    <div class="panel">
+      <h2>🛡️ Moderazione AI Discord</h2>
+      <div class="hintrow">Scrivi il <b>regolamento</b> e le <b>conseguenze</b> in linguaggio naturale: l'AI legge chat e vocale e applica le sanzioni consentite. Il bot deve avere i permessi Discord adeguati (Modera membri / Espelli / Banna).</div>
+      <div class="frow" style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="toggle" id="modToggle" onclick="toggleModeration()"></div>
+        <span id="modState" style="font-weight:700">Moderazione spenta</span>
+      </div>
+      <textarea id="modRules" rows="7" placeholder="Esempio:&#10;- Vietati insulti pesanti e bestemmie: primo avviso, alla seconda timeout 10 minuti.&#10;- Vietato spam di link: cancella il messaggio e avvisa.&#10;- Razzismo o minacce: ban immediato.&#10;- Rispettate il criceto mannaro, è sacro. 🐹"></textarea>
+      <div class="hintrow" style="margin-top:8px">Azioni consentite all'AI:</div>
+      <div id="modActions" class="addrow" style="gap:12px">
+        <label><input type="checkbox" id="ma_warn" checked> avviso</label>
+        <label><input type="checkbox" id="ma_voice"> voce</label>
+        <label><input type="checkbox" id="ma_delete" checked> cancella</label>
+        <label><input type="checkbox" id="ma_timeout" checked> timeout</label>
+        <label><input type="checkbox" id="ma_kick"> kick</label>
+        <label><input type="checkbox" id="ma_ban"> ban</label>
+      </div>
+      <div class="addrow">
+        <input id="ma_maxTimeout" type="number" min="1" max="1440" value="10" title="Timeout massimo (min)" style="flex:0 0 90px">
+        <span class="hintrow" style="margin:0;align-self:center">min timeout max · </span>
+        <input id="ma_interval" type="number" min="20" value="45" title="Ogni quanti secondi" style="flex:0 0 80px">
+        <span class="hintrow" style="margin:0;align-self:center">sec intervallo</span>
+      </div>
+      <div class="addrow"><button onclick="saveModeration()" style="flex:1">💾 Salva regolamento</button></div>
+      <div class="okmsg" id="modOk"></div>
+    </div>
   </div>
 
   <div class="col">
     <div class="panel">
-      <h2>🔥 Feed del barcello</h2>
-      <div id="feed"></div>
+      <div class="tabs">
+        <div class="tab active" data-tab="feed" onclick="switchTab('feed')">🔥 Feed</div>
+        <div class="tab" data-tab="profili" onclick="switchTab('profili')">👥 Profili</div>
+        <div class="tab" data-tab="putt" onclick="switchTab('putt')">👑 Putt</div>
+        <div class="tab" data-tab="rubrica" onclick="switchTab('rubrica')">👁️ Rubrica</div>
+        <div class="tab" data-tab="registro" onclick="switchTab('registro')">📜 Registro</div>
+      </div>
+
+      <div class="tabpane active" id="pane-feed">
+        <div id="feed"></div>
+      </div>
+
+      <div class="tabpane" id="pane-profili">
+        <div class="filters">
+          <select id="uPlatform" onchange="loadUsers()">
+            <option value="">Tutte le piattaforme</option>
+            <option value="tiktok">TikTok</option>
+            <option value="discord">Discord</option>
+          </select>
+          <select id="uSort" onchange="loadUsers()">
+            <option value="lastSeen">Visti di recente</option>
+            <option value="barcello">Più barcello</option>
+            <option value="violations">Più violazioni</option>
+            <option value="messages">Più attivi</option>
+          </select>
+          <button class="ghost" onclick="loadUsers()" style="flex:0 0 auto">↻</button>
+        </div>
+        <div class="ugrid" id="uGrid"><div class="hintrow">Nessuna persona ancora vista.</div></div>
+      </div>
+
+      <div class="tabpane" id="pane-putt">
+        <div class="hintrow">🏆 Classifica <b>putt</b>: punti fedeltà alla community (donazioni + presenza ripetuta + attività, con bonus a chi è fedele a un solo host).</div>
+        <div class="filters">
+          <select id="lbSort" onchange="loadLeaderboard()">
+            <option value="putt">👑 Punti putt</option>
+            <option value="donations">💎 Donazioni</option>
+          </select>
+          <button class="ghost" onclick="loadLeaderboard()" style="flex:0 0 auto">↻</button>
+        </div>
+        <div id="lbList"></div>
+      </div>
+
+      <div class="tabpane" id="pane-rubrica">
+        <div class="hintrow">👁️ Persone da tenere d'occhio: quando compaiono in una live/server monitorato ricevi un avviso, e se vanno da <b>un altro host</b> vieni allertato (cross-host).</div>
+        <div class="addrow">
+          <select id="wlPlatform" style="flex:0 0 110px"><option value="tiktok">TikTok</option><option value="discord">Discord</option></select>
+          <input id="wlUser" placeholder="@username da monitorare" onkeydown="if(event.key==='Enter')addWatch()">
+          <button onclick="addWatch()">+</button>
+        </div>
+        <div id="wlList"></div>
+      </div>
+
+      <div class="tabpane" id="pane-registro">
+        <div class="filters">
+          <select id="logKind" onchange="loadLog()">
+            <option value="">Tutto</option>
+            <option value="chat">💬 Chat</option>
+            <option value="voice">🎙 Vocale (parlato)</option>
+            <option value="voice-presence">🚪 Entrate/uscite vocali</option>
+            <option value="moderation">🛡️ Moderazione</option>
+            <option value="bot">🤖 Bot</option>
+            <option value="system">⚙️ Sistema</option>
+          </select>
+          <input id="logUser" placeholder="Filtra utente" onkeydown="if(event.key==='Enter')loadLog()">
+          <button class="ghost" onclick="loadLog()" style="flex:0 0 auto">↻</button>
+        </div>
+        <div id="logList"><div class="hintrow">Il registro si popola quando un server Discord è in monitoraggio.</div></div>
+      </div>
     </div>
   </div>
 </main>
+
+<!-- MODALE SCHEDA UTENTE -->
+<div id="userModalBg" onclick="if(event.target===this)closeUser()" style="position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px">
+  <div id="userModal" style="background:var(--panel);border:1px solid var(--accent);border-radius:16px;max-width:560px;width:100%;padding:22px"></div>
+</div>
 
 <!-- MODAL IMPOSTAZIONI -->
 <div id="modalBg" onclick="if(event.target===this)closeSettings()">
@@ -330,9 +479,24 @@ function connectWS() {
     else if (msg.type === 'event') addFeedEvent(msg.event);
     else if (msg.type === 'alert') fireAlert(msg);
     else if (msg.type === 'watcherAlert') fireWatcherAlert(msg);
+    else if (msg.type === 'modAlert') fireModAlert(msg);
+    else if (msg.type === 'watchPerson') fireWatchPerson(msg);
+    else if (msg.type === 'match') showToast('⚔️ Match TikTok', `${msg.host} VS ${msg.opponent}`);
   };
 }
 connectWS();
+
+// ---------- Tab colonna destra ----------
+let activeTab = 'feed';
+function switchTab(t) {
+  activeTab = t;
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
+  document.querySelectorAll('.tabpane').forEach(el => el.classList.toggle('active', el.id === `pane-${t}`));
+  if (t === 'profili') loadUsers();
+  if (t === 'putt') loadLeaderboard();
+  if (t === 'rubrica') loadWatchlist();
+  if (t === 'registro') loadLog();
+}
 
 function setChip(id, on, label) {
   const c = $(id);
@@ -352,7 +516,10 @@ function applySnapshot(s) {
   $('dcHint').style.display = s.discordReady ? 'none' : 'block';
   $('dcForms').style.display = s.discordReady ? 'block' : 'none';
   if (s.discordReady) loadGuilds();
+  if (!modLoaded) { loadModeration(); modLoaded = true; }
+  if (activeTab === 'profili') loadUsers();
 }
+let modLoaded = false;
 
 function applyScores(m) {
   for (const sc of m.scores) {
@@ -360,6 +527,7 @@ function applyScores(m) {
     if (s) Object.assign(s, sc);
   }
   renderSources();
+  updateDonCounter();
   setGauge(m.global, m.globalLevel);
   history.push({ t: Date.now(), score: m.global });
   history = history.filter(h => Date.now() - h.t < 600000);
@@ -438,6 +606,7 @@ function renderSources() {
       <div class="meta">
         ${s.viewers != null ? `<span>👁 ${s.viewers}</span>` : ''}
         ${s.audioActive ? '<span class="badge audio">🎙 AUDIO</span>' : '<span>solo chat</span>'}
+        ${s.matchOpponent ? `<span class="badge" style="background:#3a1a0e;color:var(--orange)">⚔️ VS ${esc(s.matchOpponent)}</span>` : ''}
         <span>${(levelFor(s.score)).emoji} ${(levelFor(s.score)).name}</span>
       </div>
       <div class="srcbar"><i style="width:${s.score}%;background:${colorFor(s.score)}"></i></div>
@@ -556,6 +725,195 @@ async function testIntervention() {
   const d = await r.json();
   $('iErr').textContent = d.ok ? '' : (d.error || 'test fallito');
   if (d.ok) showToast('🧪 Test inviato', `Intervento ${$('iMode').value} su ${dc.name}`);
+}
+
+// ---------- Moderazione ----------
+let modCache = { enabled: false, actions: {} };
+async function loadModeration() {
+  try {
+    const r = await fetch('/api/moderation');
+    modCache = await r.json();
+    $('modToggle').classList.toggle('on', modCache.enabled);
+    $('modState').textContent = modCache.enabled ? '🛡️ Moderazione ATTIVA' : 'Moderazione spenta';
+    $('modRules').value = modCache.rules || '';
+    for (const k of ['warn','voice','delete','timeout','kick','ban']) $(`ma_${k}`).checked = !!modCache.actions[k];
+    $('ma_maxTimeout').value = modCache.maxTimeoutMin || 10;
+    $('ma_interval').value = modCache.intervalSec || 45;
+  } catch { /* ignore */ }
+}
+async function toggleModeration() {
+  modCache.enabled = !modCache.enabled;
+  $('modToggle').classList.toggle('on', modCache.enabled);
+  $('modState').textContent = modCache.enabled ? '🛡️ Moderazione ATTIVA' : 'Moderazione spenta';
+  await saveModeration(true);
+}
+async function saveModeration(silent) {
+  const body = {
+    enabled: modCache.enabled,
+    rules: $('modRules').value,
+    actions: { warn: $('ma_warn').checked, voice: $('ma_voice').checked, delete: $('ma_delete').checked, timeout: $('ma_timeout').checked, kick: $('ma_kick').checked, ban: $('ma_ban').checked },
+    maxTimeoutMin: Number($('ma_maxTimeout').value),
+    intervalSec: Number($('ma_interval').value),
+  };
+  const r = await fetch('/api/moderation', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await r.json();
+  modCache = d.moderation;
+  if (!silent) { $('modOk').textContent = '✅ Regolamento salvato'; setTimeout(() => $('modOk').textContent = '', 3000); }
+}
+function fireModAlert(m) {
+  showToast(`🛡️ Moderazione: ${m.action}`, `${m.user} — ${m.rule || 'violazione regolamento'} (${m.sourceName})`);
+  beep([440, 330], 0.4, 0.08);
+}
+function fireWatchPerson(m) {
+  showToast(m.crossHost ? `👁️ CROSS-HOST: ${m.user}` : `👁️ ${m.user}`, m.crossHost ? `è andato da ${m.host} (visto anche: ${m.hosts.filter(h => h !== m.host).join(', ')})` : `attivo su ${m.host}`);
+  beep([660, 880], 0.4, 0.09);
+}
+
+// ---------- Donazioni + classifica putt ----------
+function updateDonCounter() {
+  const tot = sourcesCache.reduce((a, s) => a + (s.donationTotal || 0), 0);
+  const cnt = sourcesCache.reduce((a, s) => a + (s.donationCount || 0), 0);
+  $('donCounter').innerHTML = `💎 ${tot.toLocaleString('it-IT')} diamanti donati${cnt ? ` · ${cnt} gift` : ''}`;
+}
+const PUTT_MEDALS = ['🥇', '🥈', '🥉'];
+async function loadLeaderboard() {
+  try {
+    const sort = $('lbSort').value;
+    const r = await fetch(`/api/leaderboard?sort=${sort}&limit=100`);
+    const { users } = await r.json();
+    const box = $('lbList');
+    if (!users.length) { box.innerHTML = '<div class="hintrow">Ancora nessun dato. La classifica si popola con l\'attività delle live.</div>'; return; }
+    box.innerHTML = users.map((u, i) => `
+      <div class="logrow" style="cursor:pointer" onclick="openUser('${esc(u.key)}')">
+        <span style="flex:0 0 32px;font-weight:800;text-align:center">${PUTT_MEDALS[i] || (i + 1)}</span>
+        ${avatarHtml(u, '').replace('class="', 'style="width:30px;height:30px;flex-shrink:0" class="')}
+        <span style="flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis">${u.platform === 'tiktok' ? '🎵' : '💬'} ${esc(u.displayName || u.username)}${u.watched ? ' 👁️' : ''}</span>
+        <span style="flex:0 0 auto;font-weight:800;color:var(--accent2)">${sort === 'donations' ? u.donationTotal + ' 💎' : u.putt + ' putt'}</span>
+      </div>`).join('');
+  } catch { /* ignore */ }
+}
+
+// ---------- Rubrica ----------
+async function loadWatchlist() {
+  try {
+    const r = await fetch('/api/watchlist');
+    const { watchlist } = await r.json();
+    const box = $('wlList');
+    if (!watchlist.length) { box.innerHTML = '<div class="hintrow">Rubrica vuota. Aggiungi @username da tenere d\'occhio, oppure usa 👁️ dalle schede profilo.</div>'; return; }
+    box.innerHTML = watchlist.map(w => `
+      <div class="witem">
+        <div class="wtop">
+          <span class="wname">${w.platform === 'tiktok' ? '🎵' : '💬'} ${esc(w.username)}</span>
+          ${w.putt ? `<span class="wmode" style="background:#2a0d21;color:var(--accent2)">${w.putt} putt</span>` : ''}
+          <button class="rm ghost" style="border:none;background:none;color:var(--muted)" onclick="delWatch('${w.platform}','${esc(w.username)}')">✕</button>
+        </div>
+        <div class="wprompt">${w.lastSeen ? 'visto ' + timeAgo(w.lastSeen) : 'mai visto ancora'}${w.hosts && w.hosts.length ? ' · host: ' + w.hosts.map(esc).join(', ') : ''}${w.donationTotal ? ' · 💎 ' + w.donationTotal : ''}</div>
+      </div>`).join('');
+  } catch { /* ignore */ }
+}
+async function addWatch() {
+  const platform = $('wlPlatform').value, username = $('wlUser').value.trim().replace(/^@/, '');
+  if (!username) return;
+  await fetch('/api/watchlist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ platform, username }) });
+  $('wlUser').value = '';
+  loadWatchlist();
+}
+async function delWatch(platform, username) {
+  await fetch(`/api/watchlist?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(username)}`, { method: 'DELETE' });
+  loadWatchlist();
+}
+async function watchFromCard(platform, username) {
+  await fetch('/api/watchlist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ platform, username }) });
+  showToast('👁️ Aggiunto in rubrica', `${username} (${platform})`);
+}
+
+// ---------- Profili utente ----------
+function initials(name) { return (name || '?').replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '?'; }
+function timeAgo(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return `${s}s fa`;
+  if (s < 3600) return `${Math.floor(s / 60)}m fa`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h fa`;
+  return `${Math.floor(s / 86400)}g fa`;
+}
+function avatarHtml(u, cls) {
+  return u.avatar
+    ? `<img class="${cls || ''}" src="${esc(u.avatar)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'uava ${cls||''}',textContent:'${initials(u.username)}'}))">`
+    : `<div class="uava ${cls || ''}">${initials(u.username)}</div>`;
+}
+async function loadUsers() {
+  try {
+    const p = $('uPlatform').value, s = $('uSort').value;
+    const r = await fetch(`/api/users?platform=${p}&sort=${s}&limit=300`);
+    const { users } = await r.json();
+    const grid = $('uGrid');
+    if (!users.length) { grid.innerHTML = '<div class="hintrow">Nessuna persona ancora vista.</div>'; return; }
+    grid.innerHTML = users.map(u => `
+      <div class="ucard" onclick="openUser('${esc(u.key)}')">
+        ${avatarHtml(u)}
+        <div class="un">${u.platform === 'tiktok' ? '🎵' : '💬'} ${esc(u.displayName || u.username)}</div>
+        <div class="us">${timeAgo(u.lastSeen)} · ${u.counts.chat + u.counts.audio} msg</div>
+        ${u.violations ? `<span class="ubadge viol">⚠️ ${u.violations} violazioni</span>` : (u.barcelloPoints > 20 ? `<span class="ubadge hot">🔥 ${u.barcelloPoints}</span>` : '')}
+      </div>`).join('');
+  } catch { /* ignore */ }
+}
+async function openUser(key) {
+  try {
+    const r = await fetch(`/api/users/${encodeURIComponent(key)}`);
+    const { user: u } = await r.json();
+    const box = $('userModal');
+    box.innerHTML = `
+      <div class="uhead">
+        ${avatarHtml(u)}
+        <div>
+          <h2 style="color:var(--accent2)">${u.platform === 'tiktok' ? '🎵' : '💬'} ${esc(u.displayName || u.username)}</h2>
+          <div class="hintrow" style="margin:2px 0">@${esc(u.username)} · visto ${timeAgo(u.firstSeen)} → ${timeAgo(u.lastSeen)}</div>
+          <div class="hintrow" style="margin:0">Sorgenti: ${u.sources.map(esc).join(', ') || '—'}</div>
+        </div>
+      </div>
+      <div class="ustats">
+        <div class="ustat"><b>${u.counts.chat}</b><span>messaggi chat</span></div>
+        <div class="ustat"><b>${u.counts.audio}</b><span>interventi audio</span></div>
+        <div class="ustat"><b>${Math.round(u.barcelloPoints)}</b><span>punti barcello</span></div>
+        <div class="ustat"><b>${u.putt || 0}</b><span>👑 punti putt</span></div>
+        <div class="ustat"><b>${Math.round(u.donationTotal || 0)}</b><span>💎 donati (${u.donationCount || 0})</span></div>
+        <div class="ustat"><b>${Object.keys(u.hosts || {}).length}</b><span>host frequentati</span></div>
+      </div>
+      <div class="addrow" style="margin-bottom:4px">
+        <button class="ghost" onclick="watchFromCard('${u.platform}','${esc(u.username)}')" style="flex:1">👁️ Aggiungi alla rubrica</button>
+      </div>
+      ${Object.keys(u.hosts || {}).length ? `<div class="usec">🏠 Host frequentati</div>${Object.entries(u.hosts).sort((a,b)=>b[1].lastSeen-a[1].lastSeen).map(([h,d]) => `<div class="uli"><b>${esc(h)}</b> · ${d.visits||0} visite · ${d.chat||0} msg${d.donations?` · 💎 ${Math.round(d.donations)}`:''} · ${d.putt||0} putt</div>`).join('')}` : ''}
+      ${u.donations && u.donations.length ? `<div class="usec">💎 Ultime donazioni</div>${u.donations.slice().reverse().slice(0,10).map(d => `<div class="uli"><span class="lt">${new Date(d.ts).toLocaleString('it-IT')}</span> ${esc(d.gift)}${d.count>1?` x${d.count}`:''} → <b style="color:var(--accent2)">${d.value} 💎</b> <span class="hintrow" style="display:inline">(${esc(d.source)})</span></div>`).join('')}` : ''}
+      ${u.violations.length ? `<div class="usec">🛡️ Violazioni & sanzioni (${u.violations.length})</div>${u.violations.slice().reverse().slice(0, 15).map(v => `<div class="uli viol"><span class="lt">${new Date(v.ts).toLocaleString('it-IT')}</span> — <b>${esc(v.action)}</b> ${v.rule ? '· ' + esc(v.rule) : ''} ${v.detail ? `<span class="hintrow" style="display:inline">(${esc(v.detail)})</span>` : ''}</div>`).join('')}` : ''}
+      <div class="usec">💬 Ultimi messaggi (${u.samples.length})</div>
+      ${u.samples.slice().reverse().slice(0, 20).map(s => `<div class="uli"><span class="lt">${new Date(s.ts).toLocaleTimeString('it-IT')}</span> ${s.kind === 'audio' ? '🎙' : ''} ${esc(s.text)} ${s.points > 0 ? `<b style="color:var(--orange)">+${s.points}</b>` : ''}</div>`).join('') || '<div class="hintrow">Nessun messaggio registrato.</div>'}
+      <div class="modalbtns"><button class="ghost" onclick="closeUser()" style="flex:1">Chiudi</button></div>`;
+    $('userModalBg').style.display = 'flex';
+  } catch { /* ignore */ }
+}
+function closeUser() { $('userModalBg').style.display = 'none'; }
+
+// ---------- Registro Discord ----------
+const LOG_KIND_LABEL = { chat: 'chat', voice: 'voice', 'voice-presence': 'voicepresence', moderation: 'moderation', bot: 'bot', system: 'system' };
+async function loadLog() {
+  try {
+    const kind = $('logKind').value, user = $('logUser').value.trim();
+    const r = await fetch(`/api/discord/log?days=3&limit=500${kind ? '&kind=' + encodeURIComponent(kind) : ''}${user ? '&user=' + encodeURIComponent(user) : ''}`);
+    const { entries } = await r.json();
+    const box = $('logList');
+    if (!entries.length) { box.innerHTML = '<div class="hintrow">Nessuna attività registrata (per ora).</div>'; return; }
+    box.innerHTML = entries.map(e => {
+      const k = e.kind || 'system';
+      let txt = '';
+      if (k === 'chat') txt = `<b>${esc(e.user)}</b> ${e.channel ? esc(e.channel) + ' ' : ''}: ${esc(e.text || '')}`;
+      else if (k === 'voice') txt = `🎙 <b>${esc(e.user)}</b>: ${esc(e.text || '')}${e.shouted ? ' <span style="color:var(--red)">[urla]</span>' : ''}`;
+      else if (k === 'voice-presence') txt = `<b>${esc(e.user)}</b> ${e.action === 'join' ? 'è entrato' : e.action === 'leave' ? 'è uscito' : 'si è spostato'}${e.channel ? ' · ' + esc(e.channel) : ''}`;
+      else if (k === 'moderation') txt = `<b>${esc(e.user)}</b> → <b style="color:var(--red)">${esc(e.action)}</b> ${e.rule ? '· ' + esc(e.rule) : ''} ${e.text ? '· ' + esc(e.text) : ''}`;
+      else if (k === 'bot') txt = `🤖 <b>${esc(e.user)}</b> (${esc(e.via || '')}): ${esc(e.text || '')}`;
+      else txt = esc(e.text || '');
+      return `<div class="logrow"><span class="lt">${new Date(e.ts).toLocaleTimeString('it-IT')}</span><span class="lk ${LOG_KIND_LABEL[k] || 'system'}">${k}</span><span>${txt}</span></div>`;
+    }).join('');
+  } catch { /* ignore */ }
 }
 
 // ---------- Feed ----------

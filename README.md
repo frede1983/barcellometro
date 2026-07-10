@@ -8,7 +8,7 @@
 
 *💖 Edizione speciale dedicata a [@cricetomannaro000](https://www.tiktok.com/@cricetomannaro000) 🐹💖*
 
-![Version](https://img.shields.io/badge/versione-1.1.0-ff1fb0?style=for-the-badge)
+![Version](https://img.shields.io/badge/versione-1.2.0-ff1fb0?style=for-the-badge)
 ![Status](https://img.shields.io/badge/🚧_WORK_IN_PROGRESS-ff69b4?style=for-the-badge)
 ![Drama](https://img.shields.io/badge/drama-100%25_certificato-ff8fd0?style=for-the-badge)
 
@@ -192,6 +192,9 @@ Il file [`.env`](.env.example) resta solo come bootstrap opzionale; `config.json
 - [x] v1.1 — Configurazione completa dalla UI (config.json + hot-apply)
 - [x] v1.1 — Rilevatori AI personalizzati ("avvisami se parlano di...")
 - [x] v1.1 — Interventi attivi del bot Discord in chat e in voce (Edge TTS)
+- [x] v1.2 — Moderazione AI con regolamento scritto dall'utente + enforcement
+- [x] v1.2 — Registro Discord, schede profilo, match TikTok, rubrica cross-host
+- [x] v1.2 — Donazioni e classifica putt (fedeltà community)
 - [ ] Storico barcelli con replay della timeline
 - [ ] Clip automatiche dei momenti di picco
 - [ ] Notifiche Telegram/Home Assistant

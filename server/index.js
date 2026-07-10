@@ -12,6 +12,7 @@ const express = require('express');
 const { WebSocketServer } = require('ws');
 
 const cfg = require('./config');
+const store = require('./store');
 const { ScoreEngine, levelFor } = require('./scoring');
 const { AIClassifier } = require('./ai');
 const { WhisperClient } = require('./audio/whisperClient');
@@ -55,11 +56,15 @@ const ai = new AIClassifier({
   cooldownSec: cfg.get('AI_COOLDOWN_SEC'),
 });
 
-/** sources: id -> { id, platform, name, engine, impl, viewers, audioActive, startedAt, lastWatcherCheck, watcherFired } */
+/** sources: id -> { id, platform, name, engine, impl, viewers, audioActive, startedAt, ... } */
 const sources = new Map();
 let nextId = 1;
 let prevGlobal = 0;
 let lastAlertAt = 0;
+
+// Match TikTok: raggruppa sorgenti collegate e traccia chi commenta in entrambe le chat
+// matchGroups: groupId -> { members: Set(sourceId), speakers: Map(user -> Set(sourceId)) }
+const matchGroups = new Map();
 
 // ---------- Logging JSONL ----------
 const LOG_DIR = path.join(__dirname, '..', 'logs');
@@ -84,6 +89,8 @@ function snapshot() {
       score: s.engine.score, level: levelFor(s.engine.score),
       viewers: s.viewers, audioActive: Boolean(s.impl.audioActive || s.audioActive),
       startedAt: s.startedAt,
+      matchGroup: s.matchGroup || null, matchOpponent: s.matchOpponent || null,
+      donationTotal: Math.round(s.donationTotal || 0), donationCount: s.donationCount || 0,
     })),
     global: globalScore(),
     whisper: { available: whisper.available, model: whisper.model },
@@ -91,6 +98,7 @@ function snapshot() {
     discordReady: isDiscordReady(),
     watchers: cfg.get('WATCHERS'),
     interventions: cfg.get('INTERVENTIONS'),
+    moderation: { enabled: cfg.get('MODERATION').enabled },
     version: require('../package.json').version,
   };
 }
@@ -120,23 +128,69 @@ function emitEvent(src, kind, user, text, result) {
 
 function makeCallbacks(getSrc) {
   return {
-    onChat: (user, text, channel) => {
+    onChat: (user, text, channel, meta = {}) => {
       const src = getSrc();
       if (!src) return;
       const res = src.engine.addChat(user, text);
-      if (res) emitEvent(src, 'chat', channel ? `${user} ${channel}` : user, text, res);
+      let pts = res?.points || 0;
+      const notes = res ? [...res.notes] : [];
+      // Flag utenti "avanti e indietro" tra le chat di un match TikTok
+      const pingpong = trackMatchSpeaker(src, user);
+      if (pingpong) {
+        notes.push('🔀 AVANTI-INDIETRO');
+        pts += 4;
+        src.engine._add?.(4);
+      }
+      store.recordActivity(src.platform, user, 'chat', text, pts, src.name);
+      store.touchUser(src.platform, user, { avatar: meta.avatar, displayName: meta.displayName, source: src.name });
+      checkWatchlist(src, user, meta);
+      if (res || pingpong) emitEvent(src, 'chat', channel ? `${user} ${channel}` : user, text, { points: pts, matches: res?.matches || [], notes });
+      if (src.platform === 'discord') store.logActivity({ guild: src.name, kind: 'chat', user, channel: channel || null, text: String(text).slice(0, 500), points: pts });
       maybeAI(src);
     },
-    onTranscript: (speaker, text, shouted) => {
+    onMatch: (opponent, names) => {
+      const src = getSrc();
+      if (src) handleTikTokMatch(src, opponent, names);
+    },
+    onGift: (user, value, giftName, count, meta = {}) => {
+      const src = getSrc();
+      if (!src) return;
+      store.recordDonation(src.platform, user, value, giftName, count, src.name, meta);
+      src.donationTotal = (src.donationTotal || 0) + value;
+      src.donationCount = (src.donationCount || 0) + 1;
+      emitEvent(src, 'gift', `🎁 ${user}`, `ha donato ${giftName}${count > 1 ? ` x${count}` : ''} (${value} 💎)`, { points: 0, matches: [], notes: [] });
+      checkWatchlist(src, user, meta);
+    },
+    onTranscript: (speaker, text, shouted, meta = {}) => {
       const src = getSrc();
       if (!src) return;
       const res = src.engine.addTranscript(speaker, text, shouted);
+      const pts = res?.points || 0;
+      store.recordActivity(src.platform, speaker, 'audio', text, pts, src.name);
+      if (meta.avatar) store.touchUser(src.platform, speaker, { avatar: meta.avatar, source: src.name });
       emitEvent(src, 'audio', speaker, text, res || { points: 0, matches: [], notes: shouted ? ['TONI ALTI'] : [] });
+      if (src.platform === 'discord') store.logActivity({ guild: src.name, kind: 'voice', user: speaker, text: String(text).slice(0, 500), points: pts, shouted: Boolean(shouted) });
       maybeAI(src);
+    },
+    onJoin: (user, meta = {}) => {
+      const src = getSrc();
+      if (!src) return;
+      store.recordActivity(src.platform, user, 'join', null, 0, src.name);
+      if (meta.avatar) store.touchUser(src.platform, user, { avatar: meta.avatar, displayName: meta.displayName, source: src.name });
+    },
+    onVoiceActivity: (user, action, channelName) => {
+      const src = getSrc();
+      if (!src) return;
+      if (action === 'join') store.recordActivity(src.platform, user, 'join', null, 0, src.name);
+      store.logActivity({ guild: src.name, kind: 'voice-presence', user, action, channel: channelName || null });
+      emitEvent(src, 'system', user, `${action === 'join' ? 'è entrato nel' : action === 'leave' ? 'ha lasciato il' : 'si è spostato di'} canale vocale${channelName ? ' ' + channelName : ''}`, null);
     },
     onSystem: (msg) => {
       const src = getSrc();
-      if (src) emitEvent(src, 'system', 'sistema', msg, null);
+      if (src) {
+        emitEvent(src, 'system', 'sistema', msg, null);
+        if (src.platform === 'discord') store.logActivity({ guild: src.name, kind: 'system', user: 'sistema', text: msg });
+      }
     },
     onViewers: (n) => {
       const src = getSrc();
@@ -147,6 +201,74 @@ function makeCallbacks(getSrc) {
       if (src) removeSource(src.id, 'live terminata');
     },
   };
+}
+
+// ---------- Rubrica: persone monitorate + cross-host ----------
+const watchSeen = new Map(); // "platform:user" -> Set(host) gia' notificati in questa sessione
+function checkWatchlist(src, user, meta = {}) {
+  if (!store.isWatched(src.platform, user)) return;
+  const uk = `${src.platform}:${String(user).replace(/^@/, '').toLowerCase()}`;
+  let hosts = watchSeen.get(uk);
+  if (!hosts) { hosts = new Set(); watchSeen.set(uk, hosts); }
+  if (hosts.has(src.name)) return; // gia' segnalato qui
+  const isNewHost = hosts.size > 0; // gia' visto altrove = cross-host
+  hosts.add(src.name);
+  store.touchUser(src.platform, user, { avatar: meta.avatar, displayName: meta.displayName, source: src.name, newVisit: true });
+  const text = isNewHost
+    ? `👁️ ${user} (in rubrica) è comparso da un ALTRO host: ${src.name} — è già stato visto da ${[...hosts].filter(h => h !== src.name).join(', ')}`
+    : `👁️ ${user} (in rubrica) è attivo su ${src.name}`;
+  emitEvent(src, 'watch', `👁️ ${user}`, text, { points: 0, matches: [], notes: isNewHost ? ['CROSS-HOST'] : [] });
+  broadcast('watchPerson', { user, host: src.name, crossHost: isNewHost, hosts: [...hosts] });
+}
+
+// ---------- Match TikTok: avversario + ping-pong ----------
+function handleTikTokMatch(src, opponent, names) {
+  if (src.platform !== 'tiktok') return;
+  const oppName = `@${opponent.replace(/^@/, '')}`;
+  // gia' collegato?
+  if (src.matchOpponent === oppName) return;
+  src.matchOpponent = oppName;
+
+  // gruppo match
+  let groupId = src.matchGroup;
+  if (!groupId) {
+    groupId = `m${nextId++}`;
+    matchGroups.set(groupId, { members: new Set([src.id]), speakers: new Map() });
+    src.matchGroup = groupId;
+  }
+  const group = matchGroups.get(groupId);
+  emitEvent(src, 'system', 'MATCH', `⚔️ Match rilevato: ${src.name} VS ${oppName}`, null);
+  broadcast('match', { groupId, host: src.name, opponent: oppName });
+
+  // aggancia automaticamente la live dell'avversario se non gia' presente
+  const already = [...sources.values()].find(s => s.platform === 'tiktok' && s.name === oppName);
+  if (already) {
+    already.matchGroup = groupId;
+    group.members.add(already.id);
+    return;
+  }
+  addTikTok(opponent, { matchGroup: groupId, linkedTo: src.id }).then(newSrc => {
+    if (newSrc) {
+      group.members.add(newSrc.id);
+      emitEvent(newSrc, 'system', 'MATCH', `Agganciata la live avversaria di ${oppName} (chat visibile)`, null);
+    }
+  }).catch(err => {
+    emitEvent(src, 'system', 'MATCH', `Non riesco ad agganciare ${oppName}: ${err.message}`, null);
+  });
+}
+
+/** Registra che 'user' ha parlato nella chat di src; ritorna true se e' un ping-pong (presente in >=2 chat del match) */
+function trackMatchSpeaker(src, user) {
+  if (!src.matchGroup) return false;
+  const group = matchGroups.get(src.matchGroup);
+  if (!group || group.members.size < 2) return false;
+  const uk = String(user).toLowerCase();
+  let set = group.speakers.get(uk);
+  if (!set) { set = new Set(); group.speakers.set(uk, set); }
+  const before = set.size;
+  set.add(src.id);
+  // ping-pong quando compare in almeno 2 sorgenti diverse del gruppo
+  return set.size >= 2 && set.size > before;
 }
 
 async function maybeAI(src) {
@@ -206,6 +328,7 @@ async function watcherLoop() {
           const done = await src.impl.intervene(w.mode, text, cfg.get('TTS_VOICE'));
           const via = [done.chat ? 'chat' : null, done.voice ? 'voce' : null].filter(Boolean).join('+') || 'fallito';
           emitEvent(src, 'bot', `🤖 ${w.name} (${via})`, text, { points: 0, matches: [], notes: [r.evidenza].filter(Boolean) });
+          if (src.platform === 'discord') store.logActivity({ guild: src.name, kind: 'bot', user: w.name, text, via });
         } else {
           // Notifica watcher
           emitEvent(src, 'watcher', `🔔 ${w.name}`, r.evidenza || w.prompt, { points: 0, matches: [], notes: [] });
@@ -221,13 +344,71 @@ async function watcherLoop() {
 }
 setInterval(() => { watcherLoop(); }, 5000);
 
+// ---------- Moderazione AI (solo Discord) ----------
+let modBusy = false;
+let lastModTick = 0;
+async function moderationLoop() {
+  const M = cfg.get('MODERATION');
+  if (!M.enabled || !ai.enabled || !M.rules.trim()) return;
+  if (Date.now() - lastModTick < M.intervalSec * 1000) return;
+  if (modBusy) return;
+  lastModTick = Date.now();
+  modBusy = true;
+  try {
+    const cooldownMs = M.userCooldownSec * 1000;
+    for (const src of sources.values()) {
+      if (src.platform !== 'discord') continue;
+      const lastMsg = src.engine.recent[src.engine.recent.length - 1];
+      if (!lastMsg || lastMsg.ts <= (src.lastModCheck || 0)) continue;
+      src.lastModCheck = Date.now();
+      src.modFired = src.modFired || new Map();
+
+      const roster = src.impl.roster ? src.impl.roster() : [];
+      const context = `SCORE BARCELLO: ${src.engine.score}/100\n` + src.engine.contextForAI(30);
+      const actions = await ai.moderate(context, M.rules, M.actions, M.maxTimeoutMin, roster, src.name);
+      if (!actions || !actions.length) continue;
+
+      for (const act of actions) {
+        // cooldown per utente
+        const uk = act.utente.toLowerCase();
+        if (Date.now() - (src.modFired.get(uk) || 0) < cooldownMs) continue;
+        src.modFired.set(uk, Date.now());
+
+        // messaggio pubblico (warn/voice)
+        if (act.messaggioPubblico && (M.actions.warn || M.actions.voice)) {
+          const mode = M.actions.voice && M.actions.warn ? 'both' : (M.actions.voice ? 'voice' : 'chat');
+          await src.impl.intervene(mode, `@${act.utente} ${act.messaggioPubblico}`, cfg.get('TTS_VOICE'));
+        }
+        // azione strutturale (delete/timeout/kick/ban)
+        let detail = act.messaggioPubblico ? 'avviso' : '';
+        if (['delete', 'timeout', 'kick', 'ban'].includes(act.azione)) {
+          const res = await src.impl.enforce(act);
+          detail = res.detail;
+          if (!res.ok) act.azione = act.azione + '(fallito)';
+        }
+        store.recordViolation('discord', act.utente, act.regolaViolata, act.azione, detail, src.name);
+        store.logActivity({ guild: src.name, kind: 'moderation', user: act.utente, action: act.azione, rule: act.regolaViolata, text: act.messaggioPubblico, detail });
+        emitEvent(src, 'mod', `🛡️ ${act.utente}`, `[${act.azione.toUpperCase()}] ${act.regolaViolata ? act.regolaViolata + ' — ' : ''}${act.messaggioPubblico || act.motivo}`, { points: 0, matches: [], notes: [detail].filter(Boolean) });
+        broadcast('modAlert', { sourceName: src.name, user: act.utente, action: act.azione, rule: act.regolaViolata });
+      }
+    }
+  } catch (err) {
+    console.error('[moderazione]', err.message);
+  } finally {
+    modBusy = false;
+  }
+}
+setInterval(() => { moderationLoop(); }, 5000);
+
 // ---------- Gestione sorgenti ----------
-async function addTikTok(username) {
+async function addTikTok(username, matchOpts = {}) {
   const id = `tt${nextId++}`;
   const src = {
     id, platform: 'tiktok', name: `@${username.replace(/^@/, '')}`,
     engine: new ScoreEngine(id), viewers: null, audioActive: false, startedAt: Date.now(),
     impl: null,
+    matchGroup: matchOpts.matchGroup || null,
+    linkedTo: matchOpts.linkedTo || null,
   };
   const cb = makeCallbacks(() => sources.get(id));
   src.impl = new TikTokSource(username, {
@@ -288,6 +469,12 @@ function removeSource(id, reason) {
   const src = sources.get(id);
   if (!src) return false;
   try { src.impl.stop(); } catch { /* ignore */ }
+  // pulizia gruppo match
+  if (src.matchGroup && matchGroups.has(src.matchGroup)) {
+    const g = matchGroups.get(src.matchGroup);
+    g.members.delete(id);
+    if (g.members.size <= 1) matchGroups.delete(src.matchGroup);
+  }
   sources.delete(id);
   broadcast('snapshot', snapshot());
   if (reason) broadcast('event', {
@@ -473,6 +660,65 @@ app.post('/api/interventions/test', async (req, res) => {
   if (!src || src.platform !== 'discord') return res.status(400).json({ error: 'Seleziona una sorgente Discord attiva' });
   const done = await src.impl.intervene(mode || 'chat', text || 'Test del Barcellometro: sistema di intervento operativo. 🍿', cfg.get('TTS_VOICE'));
   res.json({ ok: done.chat || done.voice, done });
+});
+
+// ---------- API moderazione ----------
+app.get('/api/moderation', (req, res) => res.json(cfg.get('MODERATION')));
+app.post('/api/moderation', (req, res) => {
+  const current = cfg.get('MODERATION');
+  const merged = { ...current, ...(req.body || {}), actions: { ...current.actions, ...((req.body || {}).actions || {}) } };
+  cfg.save({ MODERATION: merged });
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, moderation: cfg.get('MODERATION') });
+});
+
+// ---------- API profili utente ----------
+app.get('/api/users', (req, res) => {
+  res.json({ users: store.listUsers({ platform: req.query.platform, source: req.query.source, sort: req.query.sort, limit: Number(req.query.limit) || 300 }) });
+});
+app.get('/api/users/:key', (req, res) => {
+  const u = store.getUser(req.params.key);
+  if (!u) return res.status(404).json({ error: 'utente non trovato' });
+  res.json({ user: u });
+});
+
+// ---------- API rubrica (watchlist) ----------
+app.get('/api/watchlist', (req, res) => res.json({ watchlist: store.listWatch() }));
+app.post('/api/watchlist', (req, res) => {
+  const { platform, username, note } = req.body || {};
+  if (!platform || !username) return res.status(400).json({ error: 'platform e username richiesti' });
+  store.addWatch(platform, username, note);
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, watchlist: store.listWatch() });
+});
+app.delete('/api/watchlist', (req, res) => {
+  store.removeWatch(req.query.platform, req.query.username);
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, watchlist: store.listWatch() });
+});
+
+// ---------- API donazioni / classifica putt ----------
+app.get('/api/leaderboard', (req, res) => {
+  const sort = req.query.sort === 'donations' ? 'donations' : 'putt';
+  res.json({ users: store.listUsers({ sort, limit: 100, platform: req.query.platform || undefined }) });
+});
+app.get('/api/donations', (req, res) => {
+  const perSource = [...sources.values()].map(s => ({ id: s.id, name: s.name, platform: s.platform, donationTotal: Math.round(s.donationTotal || 0), donationCount: s.donationCount || 0 }));
+  const totale = perSource.reduce((a, s) => a + s.donationTotal, 0);
+  res.json({ perSource, totale });
+});
+
+// ---------- API registro Discord ----------
+app.get('/api/discord/log', (req, res) => {
+  res.json({
+    entries: store.readDiscordLog({
+      days: Math.min(14, Number(req.query.days) || 2),
+      guild: req.query.guild || undefined,
+      kind: req.query.kind || undefined,
+      user: req.query.user || undefined,
+      limit: Number(req.query.limit) || 500,
+    }),
+  });
 });
 
 // ---------- Riavvio dalla UI (systemd rilancia il processo) ----------

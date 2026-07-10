@@ -128,6 +128,52 @@ Rispondi SOLO con JSON valido:
   }
 
   /**
+   * Moderazione AI: applica il regolamento scritto dall'utente al contesto recente.
+   * roster: elenco utenti citabili. allowed: azioni permesse.
+   * Ritorna { azioni: [{utente, azione, motivo, messaggioPubblico, durataMin, regolaViolata}] } o null.
+   */
+  async moderate(context, rules, allowed, maxTimeoutMin, roster, sourceName) {
+    if (!this.enabled || !rules.trim() || !context.trim()) return null;
+    const azioniPermesse = Object.entries(allowed).filter(([, v]) => v).map(([k]) => k);
+    if (!azioniPermesse.length) return null;
+    const sys = `Sei il MODERATORE AI di un server Discord italiano. Applichi il REGOLAMENTO fornito dal proprietario, con equità e senza eccessi.
+Ricevi gli ultimi messaggi/trascrizioni (chat e vocale) e devi decidere SE e COME agire.
+Regole di condotta:
+- Interviene solo per violazioni CHIARE del regolamento. Nel dubbio, non agire.
+- Scegli l'azione MINIMA efficace e proporzionata a quanto scritto nel regolamento.
+- Puoi usare SOLO queste azioni: ${azioniPermesse.join(', ')}. (warn=avviso testuale; voice=avviso vocale; delete=cancella l'ultimo messaggio offensivo; timeout=silenzia N minuti, max ${maxTimeoutMin}; kick=espelli; ban=bandisci)
+- "none" per nessuna azione su quell'utente.
+- messaggioPubblico: breve, fermo, educato, in italiano, MAI offensivo. Cita la regola.
+Rispondi SOLO con JSON valido:
+{"azioni":[{"utente":"nome esatto dal roster","azione":"warn|voice|delete|timeout|kick|ban|none","regolaViolata":"...","motivo":"...","messaggioPubblico":"...","durataMin":numero_solo_per_timeout}]}
+Se non c'e' nulla da moderare: {"azioni":[]}`;
+    const userPrompt = `Server: ${sourceName}\nUtenti presenti (usa questi nomi esatti): ${roster.join(', ') || 'n/d'}\n\nREGOLAMENTO:\n${rules}\n\nCONTESTO RECENTE:\n${context}\n\nDecisione JSON:`;
+    try {
+      const raw = this.provider === 'claude-sdk'
+        ? await this._viaCli(userPrompt, sys)
+        : await this._viaApi(userPrompt, sys);
+      if (!raw) return null;
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (!Array.isArray(parsed.azioni)) return null;
+      return parsed.azioni
+        .filter(a => a && a.azione && a.azione !== 'none' && azioniPermesse.includes(a.azione))
+        .map(a => ({
+          utente: String(a.utente || '').slice(0, 80),
+          azione: a.azione,
+          regolaViolata: String(a.regolaViolata || '').slice(0, 150),
+          motivo: String(a.motivo || '').slice(0, 200),
+          messaggioPubblico: String(a.messaggioPubblico || '').slice(0, 250),
+          durataMin: Math.max(1, Math.min(maxTimeoutMin, Number(a.durataMin) || 5)),
+        }));
+    } catch (err) {
+      console.error('[ai/moderazione] errore:', err.message);
+      return null;
+    }
+  }
+
+  /**
    * Genera il messaggio di intervento del bot (breve, italiano) in base
    * al contesto della live e al criterio scattato.
    */
