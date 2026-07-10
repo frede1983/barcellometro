@@ -4,6 +4,13 @@ Tutte le modifiche rilevanti del progetto sono documentate in questo file.
 Formato basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/),
 versionamento [SemVer](https://semver.org/lang/it/).
 
+## [1.4.1] - 2026-07-11
+
+### Corretto — Avatar
+- Estrazione avatar TikTok robusta: il campo canonico v2 è `profilePicture.url` (array), non `.urls`; aggiunti tutti i path alternativi (avatarThumb/medium/larger, snake_case) — rif. TokScope
+- **Proxy avatar** lato server (`/api/avatar`): scarica e cachea le immagini della CDN TikTok e le serve same-origin (gli URL TikTok scadono e non hanno CORS affidabile). Placeholder SVG generato (iniziali + colore) quando l'immagine manca o non si carica
+- Il bridge ora inoltra l'avatar con la stessa logica robusta
+
 ## [1.4.0] - 2026-07-11
 
 ### Aggiunto — Bridge TikTok 🌉

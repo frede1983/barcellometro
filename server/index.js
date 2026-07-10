@@ -810,6 +810,53 @@ app.get('/api/donations', (req, res) => {
   res.json({ perSource, totale });
 });
 
+// ---------- Proxy avatar (cache + placeholder) ----------
+// Gli URL avatar della CDN TikTok scadono e non hanno CORS affidabile:
+// li scarichiamo lato server, cachiamo in memoria e serviamo same-origin.
+const avatarCache = new Map(); // url -> {buf, type, ts}
+const AVATAR_TTL = 6 * 3600 * 1000;
+
+function placeholderSvg(name) {
+  const initials = String(name || '?').replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '?';
+  let h = 0;
+  for (const c of String(name || '?')) h = (h * 31 + c.charCodeAt(0)) % 360;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="hsl(${h},45%,28%)"/><text x="50%" y="50%" dy=".35em" text-anchor="middle" font-family="Segoe UI,sans-serif" font-size="52" fill="hsl(${h},70%,75%)">${initials}</text></svg>`;
+  return svg;
+}
+
+app.get('/api/avatar', async (req, res) => {
+  const url = req.query.url ? String(req.query.url) : '';
+  const name = req.query.name ? String(req.query.name) : '?';
+  const sendPlaceholder = () => {
+    res.set('Content-Type', 'image/svg+xml');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(placeholderSvg(name));
+  };
+  if (!url || !/^https?:\/\//i.test(url)) return sendPlaceholder();
+
+  const cached = avatarCache.get(url);
+  if (cached && Date.now() - cached.ts < AVATAR_TTL) {
+    res.set('Content-Type', cached.type);
+    res.set('Cache-Control', 'public, max-age=21600');
+    return res.send(cached.buf);
+  }
+  try {
+    const r = await fetch(url, { headers: { 'Referer': 'https://www.tiktok.com/', 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return sendPlaceholder();
+    const type = r.headers.get('content-type') || 'image/jpeg';
+    if (!type.startsWith('image/')) return sendPlaceholder();
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length < 100) return sendPlaceholder();
+    avatarCache.set(url, { buf, type, ts: Date.now() });
+    if (avatarCache.size > 2000) avatarCache.delete(avatarCache.keys().next().value);
+    res.set('Content-Type', type);
+    res.set('Cache-Control', 'public, max-age=21600');
+    res.send(buf);
+  } catch {
+    sendPlaceholder();
+  }
+});
+
 // ---------- API bridge ----------
 app.get('/api/bridge', (req, res) => res.json(hub.status()));
 

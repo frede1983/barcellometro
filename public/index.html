@@ -909,10 +909,14 @@ function timeAgo(ts) {
   if (s < 86400) return `${Math.floor(s / 3600)}h fa`;
   return `${Math.floor(s / 86400)}g fa`;
 }
-function avatarHtml(u, cls) {
+function avatarSrc(u) {
+  const name = encodeURIComponent(u.displayName || u.username || '?');
   return u.avatar
-    ? `<img class="${cls || ''}" src="${esc(u.avatar)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'uava ${cls||''}',textContent:'${initials(u.username)}'}))">`
-    : `<div class="uava ${cls || ''}">${initials(u.username)}</div>`;
+    ? `/api/avatar?url=${encodeURIComponent(u.avatar)}&name=${name}`
+    : `/api/avatar?name=${name}`;
+}
+function avatarHtml(u, cls) {
+  return `<img class="${cls || ''}" src="${avatarSrc(u)}" loading="lazy" alt="">`;
 }
 async function loadUsers() {
   try {

@@ -16,6 +16,7 @@ try { require('dotenv').config({ path: path.join(__dirname, '.env') }); } catch 
 
 const WebSocket = require('ws');
 const { TikTokLiveConnection, WebcastEvent, ControlEvent } = require('tiktok-live-connector');
+const { pickAvatar } = require('../server/sources/avatar');
 
 const RAW_URL = process.env.BARCELLO_URL || 'ws://localhost:3900';
 const TOKEN = process.env.BRIDGE_TOKEN || '';
@@ -86,25 +87,25 @@ async function startTikTok(username) {
 
   conn.on(WebcastEvent.CHAT, (d) => {
     if (!d.comment) return;
-    send({ t: 'event', username: u, kind: 'chat', user: d.user?.uniqueId || d.user?.nickname || 'anonimo', text: d.comment, avatar: d.user?.profilePicture?.urls?.[0] || null, displayName: d.user?.nickname || null });
+    send({ t: 'event', username: u, kind: 'chat', user: d.user?.uniqueId || d.user?.nickname || 'anonimo', text: d.comment, avatar: pickAvatar(d), displayName: d.user?.nickname || null });
   });
   conn.on(WebcastEvent.ROOM_USER, (d) => {
     if (typeof d.viewerCount === 'number') send({ t: 'event', username: u, kind: 'viewers', count: d.viewerCount });
   });
   conn.on(WebcastEvent.MEMBER, (d) => {
     const user = d.user?.uniqueId || d.user?.nickname;
-    if (user) send({ t: 'event', username: u, kind: 'join', user, avatar: d.user?.profilePicture?.urls?.[0] || null, displayName: d.user?.nickname || null });
+    if (user) send({ t: 'event', username: u, kind: 'join', user, avatar: pickAvatar(d), displayName: d.user?.nickname || null });
   });
   conn.on(WebcastEvent.GIFT, (d) => {
     const giftType = d.giftDetails?.giftType ?? d.giftType;
     if (giftType === 1 && d.repeatEnd === false) return;
     const repeat = d.repeatCount || 1;
     const diamonds = (d.giftDetails?.diamondCount ?? d.extendedGiftInfo?.diamond_count ?? 0) * repeat;
-    send({ t: 'event', username: u, kind: 'gift', user: d.user?.uniqueId || d.user?.nickname || 'anonimo', value: diamonds, giftName: d.giftDetails?.giftName || `gift ${d.giftId || ''}`, count: repeat, avatar: d.user?.profilePicture?.urls?.[0] || null, displayName: d.user?.nickname || null });
+    send({ t: 'event', username: u, kind: 'gift', user: d.user?.uniqueId || d.user?.nickname || 'anonimo', value: diamonds, giftName: d.giftDetails?.giftName || `gift ${d.giftId || ''}`, count: repeat, avatar: pickAvatar(d), displayName: d.user?.nickname || null });
   });
   const social = (type) => (d) => {
     const user = d.user?.uniqueId || d.user?.nickname;
-    if (user) send({ t: 'event', username: u, kind: 'social', socialType: type, count: type === 'like' ? (d.likeCount || 1) : 1, user, avatar: d.user?.profilePicture?.urls?.[0] || null });
+    if (user) send({ t: 'event', username: u, kind: 'social', socialType: type, count: type === 'like' ? (d.likeCount || 1) : 1, user, avatar: pickAvatar(d) });
   };
   if (WebcastEvent.SHARE) conn.on(WebcastEvent.SHARE, social('share'));
   if (WebcastEvent.FOLLOW) conn.on(WebcastEvent.FOLLOW, social('follow'));

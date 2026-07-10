@@ -6,6 +6,7 @@
 const { spawn } = require('child_process');
 const { TikTokLiveConnection, WebcastEvent, ControlEvent } = require('tiktok-live-connector');
 const { pcm16ToWav, rms } = require('../audio/wav');
+const { pickAvatar } = require('./avatar');
 
 class TikTokSource {
   /**
@@ -43,15 +44,13 @@ class TikTokSource {
 
     this.connection.on(WebcastEvent.CHAT, (data) => {
       const user = data.user?.uniqueId || data.user?.nickname || 'anonimo';
-      const avatar = data.user?.profilePicture?.urls?.[0] || data.user?.profilePicture?.url?.[0] || null;
       const displayName = data.user?.nickname || null;
-      if (data.comment) this.opts.onChat(user, data.comment, null, { avatar, displayName });
+      if (data.comment) this.opts.onChat(user, data.comment, null, { avatar: pickAvatar(data), displayName });
     });
 
     this.connection.on(WebcastEvent.MEMBER, (data) => {
       const user = data.user?.uniqueId || data.user?.nickname;
-      const avatar = data.user?.profilePicture?.urls?.[0] || null;
-      if (user) this.opts.onJoin?.(user, { avatar, displayName: data.user?.nickname || null });
+      if (user) this.opts.onJoin?.(user, { avatar: pickAvatar(data), displayName: data.user?.nickname || null });
     });
 
     // --- Social: condivisioni, follow, like (taptap) ---
