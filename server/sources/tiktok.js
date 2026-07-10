@@ -45,6 +45,22 @@ class TikTokSource {
       if (user) this.opts.onJoin?.(user, { avatar, displayName: data.user?.nickname || null });
     });
 
+    // --- Social: condivisioni, follow, like (taptap) ---
+    if (WebcastEvent.SHARE) this.connection.on(WebcastEvent.SHARE, (data) => {
+      const user = data.user?.uniqueId || data.user?.nickname;
+      const avatar = data.user?.profilePicture?.urls?.[0] || null;
+      if (user) this.opts.onSocial?.(user, 'share', 1, { avatar });
+    });
+    if (WebcastEvent.FOLLOW) this.connection.on(WebcastEvent.FOLLOW, (data) => {
+      const user = data.user?.uniqueId || data.user?.nickname;
+      const avatar = data.user?.profilePicture?.urls?.[0] || null;
+      if (user) this.opts.onSocial?.(user, 'follow', 1, { avatar });
+    });
+    if (WebcastEvent.LIKE) this.connection.on(WebcastEvent.LIKE, (data) => {
+      const user = data.user?.uniqueId || data.user?.nickname;
+      if (user) this.opts.onSocial?.(user, 'like', data.likeCount || 1, {});
+    });
+
     // --- Donazioni (gift) ---
     this.connection.on(WebcastEvent.GIFT, (data) => {
       try {
@@ -195,7 +211,7 @@ class TikTokSource {
 
     const whisper = this.opts.whisper;
     if (!whisper || !whisper.available) return;
-    const text = await whisper.transcribe(pcm16ToWav(pcm, 16000, 1));
+    const text = await whisper.transcribe(pcm16ToWav(pcm, 16000, 1), this.opts.audioLang || 'it');
     if (text) this.opts.onTranscript(`@${this.username} (live)`, text, shouted);
   }
 

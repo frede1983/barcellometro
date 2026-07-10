@@ -13,7 +13,10 @@ const { WebSocketServer } = require('ws');
 
 const cfg = require('./config');
 const store = require('./store');
+const history = require('./history');
+const { Notifier } = require('./notify');
 const { ScoreEngine, levelFor } = require('./scoring');
+const { setLangs } = require('./keywords');
 const { AIClassifier } = require('./ai');
 const { WhisperClient } = require('./audio/whisperClient');
 const { TikTokSource } = require('./sources/tiktok');
@@ -47,6 +50,10 @@ const wss = new WebSocketServer({
   verifyClient: (info) => checkAuth(info.req.headers.authorization),
 });
 
+store.setPuttWeights(cfg.get('PUTT_WEIGHTS'));
+setLangs(String(cfg.get('DETECT_LANGS') || 'it').split(',').map(s => s.trim()).filter(Boolean));
+
+const notifier = new Notifier((k) => cfg.get(k));
 const whisper = new WhisperClient(cfg.get('WHISPER_URL'));
 const ai = new AIClassifier({
   provider: cfg.get('AI_PROVIDER'),
@@ -114,6 +121,7 @@ wss.on('connection', (ws) => {
 });
 
 // ---------- Eventi dalle sorgenti ----------
+const eventBuffer = []; // buffer globale per costruire le clip di picco
 function emitEvent(src, kind, user, text, result) {
   const ev = {
     ts: Date.now(), sourceId: src.id, sourceName: src.name, platform: src.platform,
@@ -123,7 +131,23 @@ function emitEvent(src, kind, user, text, result) {
     notes: result?.notes || [],
   };
   broadcast('event', { event: ev });
-  if (ev.points > 0 || ['ai', 'system', 'watcher'].includes(kind)) logEvent(ev);
+  eventBuffer.push(ev);
+  if (eventBuffer.length > 400) eventBuffer.shift();
+  if (ev.points > 0 || ['ai', 'system', 'watcher', 'mod', 'watch', 'gift'].includes(kind)) logEvent(ev);
+}
+
+/** Costruisce una clip-highlight dal buffer attorno al picco di una sorgente */
+function buildClip(src) {
+  const since = Date.now() - 45000; // 45s prima del picco
+  const events = eventBuffer.filter(e => e.sourceId === src.id && e.ts >= since && ['chat', 'audio', 'ai', 'mod'].includes(e.kind))
+    .slice(-40)
+    .map(e => ({ ts: e.ts, kind: e.kind, user: e.user, text: e.text, points: e.points }));
+  if (events.length < 2) return null;
+  return history.addClip({
+    sourceName: src.name, platform: src.platform, peakScore: src.engine.score,
+    title: `${src.name} — barcello ${src.engine.score}/100`,
+    events,
+  });
 }
 
 function makeCallbacks(getSrc) {
@@ -160,6 +184,14 @@ function makeCallbacks(getSrc) {
       src.donationCount = (src.donationCount || 0) + 1;
       emitEvent(src, 'gift', `🎁 ${user}`, `ha donato ${giftName}${count > 1 ? ` x${count}` : ''} (${value} 💎)`, { points: 0, matches: [], notes: [] });
       checkWatchlist(src, user, meta);
+    },
+    onSocial: (user, type, count, meta = {}) => {
+      const src = getSrc();
+      if (!src) return;
+      store.recordSocial(src.platform, user, type, count, src.name, meta);
+      if (type === 'share') emitEvent(src, 'gift', `🔁 ${user}`, `ha condiviso la live (+putt)`, { points: 0, matches: [], notes: [] });
+      else if (type === 'follow') emitEvent(src, 'gift', `➕ ${user}`, `ha seguito l'host (+putt)`, { points: 0, matches: [], notes: [] });
+      // i like (taptap) sono troppo frequenti per il feed: contano solo nei putt
     },
     onTranscript: (speaker, text, shouted, meta = {}) => {
       const src = getSrc();
@@ -219,6 +251,9 @@ function checkWatchlist(src, user, meta = {}) {
     : `👁️ ${user} (in rubrica) è attivo su ${src.name}`;
   emitEvent(src, 'watch', `👁️ ${user}`, text, { points: 0, matches: [], notes: isNewHost ? ['CROSS-HOST'] : [] });
   broadcast('watchPerson', { user, host: src.name, crossHost: isNewHost, hosts: [...hosts] });
+  if (isNewHost && cfg.get('NOTIFY_ON_CROSSHOST')) {
+    notifier.broadcast(`👁️ <b>${user}</b> (rubrica) è andato da un altro host: ${src.name}`);
+  }
 }
 
 // ---------- Match TikTok: avversario + ping-pong ----------
@@ -390,6 +425,9 @@ async function moderationLoop() {
         store.logActivity({ guild: src.name, kind: 'moderation', user: act.utente, action: act.azione, rule: act.regolaViolata, text: act.messaggioPubblico, detail });
         emitEvent(src, 'mod', `🛡️ ${act.utente}`, `[${act.azione.toUpperCase()}] ${act.regolaViolata ? act.regolaViolata + ' — ' : ''}${act.messaggioPubblico || act.motivo}`, { points: 0, matches: [], notes: [detail].filter(Boolean) });
         broadcast('modAlert', { sourceName: src.name, user: act.utente, action: act.azione, rule: act.regolaViolata });
+        if (cfg.get('NOTIFY_ON_MODERATION')) {
+          notifier.broadcast(`🛡️ Moderazione ${src.name}: <b>${act.azione}</b> su ${act.utente}${act.regolaViolata ? ' — ' + act.regolaViolata : ''}`);
+        }
       }
     }
   } catch (err) {
@@ -415,6 +453,7 @@ async function addTikTok(username, matchOpts = {}) {
     signApiKey: cfg.get('TIKTOK_SIGN_API_KEY') || undefined,
     audioEnabled: cfg.get('AUDIO_ENABLED'),
     chunkSec: cfg.get('AUDIO_CHUNK_SEC'),
+    audioLang: cfg.get('AUDIO_LANG') || 'it',
     whisper,
     ...cb,
   });
@@ -452,7 +491,7 @@ async function addDiscord({ guildId, textChannelIds, voiceChannelId }) {
   const cb = makeCallbacks(() => sources.get(id));
   src.impl = new DiscordSource({
     guildId, textChannelIds: textChannelIds || [], voiceChannelId: voiceChannelId || null,
-    whisper, ...cb,
+    whisper, audioLang: cfg.get('AUDIO_LANG') || 'it', ...cb,
   });
   sources.set(id, src);
   try {
@@ -570,6 +609,12 @@ app.post('/api/settings', async (req, res) => {
     applied.push(r ? `Whisper ricaricato (${cfg.get('WHISPER_MODEL')})` : 'Whisper: reload fallito (sidecar spento?)');
   }
   if (result.changed.includes('DASH_PASSWORD')) applied.push('Password aggiornata (ricarica la pagina)');
+
+  // Lingue rilevamento a caldo
+  if (result.changed.includes('DETECT_LANGS')) {
+    setLangs(String(cfg.get('DETECT_LANGS') || 'it').split(',').map(s => s.trim()).filter(Boolean));
+    applied.push('Lingue rilevamento aggiornate');
+  }
 
   broadcast('snapshot', snapshot());
   res.json({ ok: true, changed: result.changed, needsRestart: result.needsRestart, applied });
@@ -697,6 +742,15 @@ app.delete('/api/watchlist', (req, res) => {
   res.json({ ok: true, watchlist: store.listWatch() });
 });
 
+// ---------- API pesi putt ----------
+app.get('/api/putt-weights', (req, res) => res.json({ weights: cfg.get('PUTT_WEIGHTS') }));
+app.post('/api/putt-weights', (req, res) => {
+  cfg.save({ PUTT_WEIGHTS: { ...cfg.get('PUTT_WEIGHTS'), ...(req.body || {}) } });
+  store.setPuttWeights(cfg.get('PUTT_WEIGHTS'));
+  broadcast('snapshot', snapshot());
+  res.json({ ok: true, weights: cfg.get('PUTT_WEIGHTS') });
+});
+
 // ---------- API donazioni / classifica putt ----------
 app.get('/api/leaderboard', (req, res) => {
   const sort = req.query.sort === 'donations' ? 'donations' : 'putt';
@@ -706,6 +760,29 @@ app.get('/api/donations', (req, res) => {
   const perSource = [...sources.values()].map(s => ({ id: s.id, name: s.name, platform: s.platform, donationTotal: Math.round(s.donationTotal || 0), donationCount: s.donationCount || 0 }));
   const totale = perSource.reduce((a, s) => a + s.donationTotal, 0);
   res.json({ perSource, totale });
+});
+
+// ---------- API storico + replay ----------
+app.get('/api/history', (req, res) => {
+  res.json({ points: history.recent(Number(req.query.minutes) || 60) });
+});
+app.get('/api/history/replay', (req, res) => {
+  const day = req.query.day || new Date().toISOString().slice(0, 10);
+  res.json({ day, points: history.replayDay(day) });
+});
+
+// ---------- API clip ----------
+app.get('/api/clips', (req, res) => res.json({ clips: history.listClips(Number(req.query.limit) || 100) }));
+app.get('/api/clips/:id', (req, res) => {
+  const c = history.getClip(req.params.id);
+  if (!c) return res.status(404).json({ error: 'clip non trovata' });
+  res.json({ clip: c });
+});
+
+// ---------- API notifiche (test) ----------
+app.post('/api/notify/test', async (req, res) => {
+  const r = await notifier.broadcast('🍿 Test Barcellometro: notifiche operative.', 'Test del Barcellometro. Le notifiche funzionano.');
+  res.json({ ok: r.telegram || r.ha, ...r, telegramEnabled: notifier.telegramEnabled, haEnabled: notifier.haEnabled });
 });
 
 // ---------- API registro Discord ----------
@@ -745,9 +822,25 @@ setInterval(() => {
     const top = [...sources.values()].sort((a, b) => b.engine.score - a.engine.score)[0];
     broadcast('alert', { global, sourceName: top ? top.name : '?', platform: top ? top.platform : '?' });
     logEvent({ ts: now, kind: 'ALERT', global, source: top?.name });
+    // Clip automatica del picco
+    if (cfg.get('CLIPS_ENABLED') && top) {
+      const clip = buildClip(top);
+      if (clip) broadcast('clip', { id: clip.id, sourceName: clip.sourceName, peakScore: clip.peakScore });
+    }
+    // Notifiche esterne
+    if (cfg.get('NOTIFY_ON_ALERT') && top) {
+      const txt = `🍿 <b>BARCELLO</b> su ${top.name} — livello ${global}/100 ${levelFor(global).emoji}`;
+      notifier.broadcast(txt, `Attenzione. Barcello rilevato su ${top.name}, livello ${global} su 100.`);
+    }
   }
   prevGlobal = global;
 }, 1000);
+
+// Campionamento storico
+setInterval(() => {
+  if (sources.size === 0) return;
+  history.sample(globalScore(), [...sources.values()].map(s => ({ name: s.name, score: s.engine.score })));
+}, history.SAMPLE_SEC * 1000);
 
 setInterval(() => { whisper.checkHealth(); }, 30000);
 

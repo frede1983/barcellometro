@@ -312,6 +312,7 @@
         <div class="tab" data-tab="profili" onclick="switchTab('profili')">👥 Profili</div>
         <div class="tab" data-tab="putt" onclick="switchTab('putt')">👑 Putt</div>
         <div class="tab" data-tab="rubrica" onclick="switchTab('rubrica')">👁️ Rubrica</div>
+        <div class="tab" data-tab="clip" onclick="switchTab('clip')">🎬 Clip</div>
         <div class="tab" data-tab="registro" onclick="switchTab('registro')">📜 Registro</div>
       </div>
 
@@ -338,7 +339,22 @@
       </div>
 
       <div class="tabpane" id="pane-putt">
-        <div class="hintrow">🏆 Classifica <b>putt</b>: punti fedeltà alla community (donazioni + presenza ripetuta + attività, con bonus a chi è fedele a un solo host).</div>
+        <div class="hintrow">🏆 Classifica <b>putt</b>: punti fedeltà alla community. Imposta sotto quanti punti vale ogni azione.</div>
+        <details style="margin-bottom:12px">
+          <summary style="cursor:pointer;color:var(--accent2);font-weight:700;padding:6px 0">⚙️ Punteggi per azione</summary>
+          <div style="background:var(--panel2);border-radius:10px;padding:12px;margin-top:8px">
+            <div class="frow"><label>💎 Donazione (per diamante)</label><input id="pw_donation" type="number" step="0.1" min="0"></div>
+            <div class="frow"><label>🔁 Condivisione live</label><input id="pw_share" type="number" step="1" min="0"></div>
+            <div class="frow"><label>➕ Follow</label><input id="pw_follow" type="number" step="1" min="0"></div>
+            <div class="frow"><label>👍 Taptap / like</label><input id="pw_like" type="number" step="0.01" min="0"></div>
+            <div class="frow"><label>💬 Messaggio chat</label><input id="pw_chat" type="number" step="0.1" min="0"></div>
+            <div class="frow"><label>🎙 Intervento vocale</label><input id="pw_audio" type="number" step="0.1" min="0"></div>
+            <div class="frow"><label>🚪 Presenza/ritorno</label><input id="pw_visit" type="number" step="1" min="0"></div>
+            <div class="frow"><label>💖 Bonus fedeltà (%)</label><input id="pw_loyaltyBonusPct" type="number" step="1" min="0"></div>
+            <div class="addrow"><button onclick="savePuttWeights()" style="flex:1">💾 Salva punteggi putt</button></div>
+            <div class="okmsg" id="pwOk"></div>
+          </div>
+        </details>
         <div class="filters">
           <select id="lbSort" onchange="loadLeaderboard()">
             <option value="putt">👑 Punti putt</option>
@@ -357,6 +373,11 @@
           <button onclick="addWatch()">+</button>
         </div>
         <div id="wlList"></div>
+      </div>
+
+      <div class="tabpane" id="pane-clip">
+        <div class="hintrow">🎬 Clip automatiche dei momenti di picco: chat e trascrizioni catturate quando il barcello supera la soglia.</div>
+        <div id="clipList"><div class="hintrow">Nessuna clip ancora. Si generano automaticamente ai picchi di barcello.</div></div>
       </div>
 
       <div class="tabpane" id="pane-registro">
@@ -418,6 +439,27 @@
 
     <h3>🎵 TikTok</h3>
     <div class="frow"><label>API key Euler Stream</label><input id="s_TIKTOK_SIGN_API_KEY" type="password" placeholder=""></div>
+
+    <h3>🌍 Lingue</h3>
+    <div class="frow"><label>Rilevamento (csv: it,en,es)</label><input id="s_DETECT_LANGS" placeholder="it,en,es"></div>
+    <div class="frow"><label>Lingua audio (Whisper)</label>
+      <select id="s_AUDIO_LANG"><option value="it">Italiano</option><option value="en">English</option><option value="es">Español</option></select>
+    </div>
+
+    <h3>🔔 Notifiche esterne</h3>
+    <div class="frow"><label>Telegram bot token</label><input id="s_TELEGRAM_BOT_TOKEN" type="password" placeholder=""></div>
+    <div class="frow"><label>Telegram chat ID</label><input id="s_TELEGRAM_CHAT_ID" placeholder=""></div>
+    <div class="frow"><label>Home Assistant URL</label><input id="s_HA_URL" placeholder="http://192.168.1.157:8123"></div>
+    <div class="frow"><label>HA token</label><input id="s_HA_TOKEN" type="password" placeholder=""></div>
+    <div class="frow"><label>HA media player</label><input id="s_HA_MEDIA_PLAYER" placeholder="media_player.sound2"></div>
+    <div class="frow"><label>HA entità TTS</label><input id="s_HA_TTS_ENTITY" placeholder="tts.piper"></div>
+    <div class="frow"><label>Notifica su allarme</label><select id="s_NOTIFY_ON_ALERT"><option value="true">Sì</option><option value="false">No</option></select></div>
+    <div class="frow"><label>Notifica su moderazione</label><select id="s_NOTIFY_ON_MODERATION"><option value="false">No</option><option value="true">Sì</option></select></div>
+    <div class="frow"><label>Notifica cross-host</label><select id="s_NOTIFY_ON_CROSSHOST"><option value="true">Sì</option><option value="false">No</option></select></div>
+    <div class="frow"><label></label><button class="ghost" onclick="testNotify()">🧪 Test notifiche</button><span id="notifyTestOut" class="okmsg"></span></div>
+
+    <h3>🎬 Clip</h3>
+    <div class="frow"><label>Clip automatiche ai picchi</label><select id="s_CLIPS_ENABLED"><option value="true">Attive</option><option value="false">Spente</option></select></div>
 
     <h3>🎙 Audio / Whisper</h3>
     <div class="frow"><label>Analisi audio</label>
@@ -482,6 +524,7 @@ function connectWS() {
     else if (msg.type === 'modAlert') fireModAlert(msg);
     else if (msg.type === 'watchPerson') fireWatchPerson(msg);
     else if (msg.type === 'match') showToast('⚔️ Match TikTok', `${msg.host} VS ${msg.opponent}`);
+    else if (msg.type === 'clip') { showToast('🎬 Clip salvata', `${msg.sourceName} — picco ${msg.peakScore}/100`); if (activeTab === 'clip') loadClips(); }
   };
 }
 connectWS();
@@ -493,8 +536,9 @@ function switchTab(t) {
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
   document.querySelectorAll('.tabpane').forEach(el => el.classList.toggle('active', el.id === `pane-${t}`));
   if (t === 'profili') loadUsers();
-  if (t === 'putt') loadLeaderboard();
+  if (t === 'putt') { loadLeaderboard(); loadPuttWeights(); }
   if (t === 'rubrica') loadWatchlist();
+  if (t === 'clip') loadClips();
   if (t === 'registro') loadLog();
 }
 
@@ -793,6 +837,23 @@ async function loadLeaderboard() {
   } catch { /* ignore */ }
 }
 
+const PUTT_KEYS = ['donation','share','follow','like','chat','audio','visit','loyaltyBonusPct'];
+async function loadPuttWeights() {
+  try {
+    const r = await fetch('/api/putt-weights');
+    const { weights } = await r.json();
+    for (const k of PUTT_KEYS) if ($(`pw_${k}`)) $(`pw_${k}`).value = weights[k];
+  } catch { /* ignore */ }
+}
+async function savePuttWeights() {
+  const body = {};
+  for (const k of PUTT_KEYS) body[k] = Number($(`pw_${k}`).value);
+  await fetch('/api/putt-weights', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  $('pwOk').textContent = '✅ Punteggi salvati e classifica ricalcolata';
+  setTimeout(() => $('pwOk').textContent = '', 3000);
+  loadLeaderboard();
+}
+
 // ---------- Rubrica ----------
 async function loadWatchlist() {
   try {
@@ -892,6 +953,42 @@ async function openUser(key) {
   } catch { /* ignore */ }
 }
 function closeUser() { $('userModalBg').style.display = 'none'; }
+
+// ---------- Clip di picco ----------
+async function loadClips() {
+  try {
+    const r = await fetch('/api/clips?limit=100');
+    const { clips } = await r.json();
+    const box = $('clipList');
+    if (!clips.length) { box.innerHTML = '<div class="hintrow">Nessuna clip ancora. Si generano automaticamente ai picchi di barcello.</div>'; return; }
+    box.innerHTML = clips.map(c => `
+      <div class="witem" style="cursor:pointer" onclick="openClip('${c.id}')">
+        <div class="wtop">
+          <span class="wname">🎬 ${esc(c.sourceName)}</span>
+          <span class="wmode" style="background:#2d0f22;color:var(--red)">${c.peakScore}/100</span>
+        </div>
+        <div class="wprompt">${new Date(c.ts).toLocaleString('it-IT')} · ${c.eventCount} eventi</div>
+      </div>`).join('');
+  } catch { /* ignore */ }
+}
+async function openClip(id) {
+  try {
+    const r = await fetch(`/api/clips/${id}`);
+    const { clip } = await r.json();
+    const box = $('userModal');
+    box.innerHTML = `
+      <h2 style="color:var(--accent2)">🎬 ${esc(clip.title)}</h2>
+      <div class="hintrow">${new Date(clip.ts).toLocaleString('it-IT')} · picco ${clip.peakScore}/100 · ${clip.platform}</div>
+      <div class="usec">Momento del barcello</div>
+      ${(clip.events || []).map(e => `<div class="uli"><span class="lt">${new Date(e.ts).toLocaleTimeString('it-IT')}</span> ${e.kind === 'audio' ? '🎙' : e.kind === 'ai' ? '🤖' : e.kind === 'mod' ? '🛡️' : ''} <b>${esc(e.user)}:</b> ${esc(e.text)} ${e.points > 0 ? `<b style="color:var(--orange)">+${e.points}</b>` : ''}</div>`).join('')}
+      <div class="modalbtns">
+        <button class="ghost" onclick="downloadClip('${clip.id}')" style="flex:1">⬇️ Scarica (JSON)</button>
+        <button class="ghost" onclick="closeUser()">Chiudi</button>
+      </div>`;
+    $('userModalBg').style.display = 'flex';
+  } catch { /* ignore */ }
+}
+function downloadClip(id) { window.open(`/api/clips/${id}`, '_blank'); }
 
 // ---------- Registro Discord ----------
 const LOG_KIND_LABEL = { chat: 'chat', voice: 'voice', 'voice-presence': 'voicepresence', moderation: 'moderation', bot: 'bot', system: 'system' };
@@ -995,7 +1092,7 @@ if (window.Notification && Notification.permission === 'default') {
 }
 
 // ---------- Impostazioni ----------
-const SETTING_FIELDS = ['AI_PROVIDER','AI_MODEL','ANTHROPIC_API_KEY','AI_TRIGGER_SCORE','AI_COOLDOWN_SEC','DISCORD_BOT_TOKEN','TTS_VOICE','TIKTOK_SIGN_API_KEY','AUDIO_ENABLED','WHISPER_MODEL','AUDIO_CHUNK_SEC','WATCHER_INTERVAL_SEC','WATCHER_COOLDOWN_SEC','INTERVENTION_COOLDOWN_SEC','ALERT_THRESHOLD','DASH_PASSWORD','PORT'];
+const SETTING_FIELDS = ['AI_PROVIDER','AI_MODEL','ANTHROPIC_API_KEY','AI_TRIGGER_SCORE','AI_COOLDOWN_SEC','DISCORD_BOT_TOKEN','TTS_VOICE','TIKTOK_SIGN_API_KEY','DETECT_LANGS','AUDIO_LANG','TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID','HA_URL','HA_TOKEN','HA_MEDIA_PLAYER','HA_TTS_ENTITY','NOTIFY_ON_ALERT','NOTIFY_ON_MODERATION','NOTIFY_ON_CROSSHOST','CLIPS_ENABLED','AUDIO_ENABLED','WHISPER_MODEL','AUDIO_CHUNK_SEC','WATCHER_INTERVAL_SEC','WATCHER_COOLDOWN_SEC','INTERVENTION_COOLDOWN_SEC','ALERT_THRESHOLD','DASH_PASSWORD','PORT'];
 
 async function openSettings() {
   $('sErr').textContent = ''; $('sOk').textContent = ''; $('aiTestOut').textContent = '';
@@ -1049,6 +1146,18 @@ async function testAI() {
   } catch (err) {
     $('aiTestOut').textContent = '❌ ' + err.message;
   }
+}
+
+async function testNotify() {
+  $('notifyTestOut').textContent = '...';
+  try {
+    const r = await fetch('/api/notify/test', { method: 'POST' });
+    const d = await r.json();
+    const parts = [];
+    if (d.telegramEnabled) parts.push(`Telegram: ${d.telegram ? '✅' : '❌'}`);
+    if (d.haEnabled) parts.push(`HA: ${d.ha ? '✅' : '❌'}`);
+    $('notifyTestOut').textContent = parts.length ? parts.join(' · ') : 'Nessun canale configurato';
+  } catch (err) { $('notifyTestOut').textContent = '❌ ' + err.message; }
 }
 
 async function restartServer() {

@@ -21,6 +21,18 @@ let watchlist = [];
 try { watchlist = JSON.parse(fs.readFileSync(WATCH_FILE, 'utf8')); } catch { watchlist = []; }
 function saveWatchlist() { fs.writeFile(WATCH_FILE, JSON.stringify(watchlist), () => {}); }
 
+// Pesi putt configurabili (impostati da index.js in base al config)
+let puttWeights = {
+  donation: 1.0, share: 15, follow: 25, like: 0.02,
+  chat: 0.3, audio: 0.8, visit: 8, loyaltyBonusPct: 15,
+};
+function setPuttWeights(w) {
+  if (w && typeof w === 'object') puttWeights = { ...puttWeights, ...w };
+  // ricalcola tutti i profili con i nuovi pesi
+  for (const u of Object.values(users)) recomputePutt(u);
+  scheduleSave();
+}
+
 let saveTimer = null;
 function scheduleSave() {
   if (saveTimer) return;
@@ -96,6 +108,20 @@ function recordActivity(platform, username, kind, text, points, source) {
   return u;
 }
 
+/** Registra un'azione social (share, follow, like/taptap). */
+function recordSocial(platform, username, type, count, source, meta = {}) {
+  const u = touchUser(platform, username, { source, avatar: meta.avatar, displayName: meta.displayName });
+  const h = u.hosts[source];
+  const n = Math.max(1, Number(count) || 1);
+  if (!u.social) u.social = { shares: 0, follows: 0, likes: 0 };
+  if (type === 'share') { u.social.shares += n; if (h) h.shares += n; }
+  else if (type === 'follow') { u.social.follows += n; if (h) h.follows += n; }
+  else if (type === 'like') { u.social.likes += n; if (h) h.likes += n; }
+  recomputePutt(u);
+  scheduleSave();
+  return u;
+}
+
 /** Registra una donazione (gift). value = diamanti. */
 function recordDonation(platform, username, value, giftName, count, source, meta = {}) {
   const u = touchUser(platform, username, { source, avatar: meta.avatar, displayName: meta.displayName });
@@ -117,10 +143,17 @@ function recordDonation(platform, username, value, giftName, count, source, meta
  * con bonus fedelta' se concentrata su un singolo host.
  */
 function recomputePutt(u) {
+  const w = puttWeights;
   let total = 0;
   const hostVals = [];
   for (const host of Object.values(u.hosts || {})) {
-    const hv = host.donations * 1.0 + host.visits * 8 + host.chat * 0.3 + host.audio * 0.8;
+    const hv = (host.donations || 0) * w.donation
+      + (host.visits || 0) * w.visit
+      + (host.chat || 0) * w.chat
+      + (host.audio || 0) * w.audio
+      + (host.shares || 0) * w.share
+      + (host.follows || 0) * w.follow
+      + (host.likes || 0) * w.like;
     host.putt = Math.round(hv);
     hostVals.push(hv);
     total += hv;
@@ -128,7 +161,7 @@ function recomputePutt(u) {
   // bonus fedelta': se >70% dei punti viene da un solo host
   if (hostVals.length && total > 0) {
     const top = Math.max(...hostVals);
-    if (top / total > 0.7) total *= 1.15;
+    if (top / total > 0.7) total *= (1 + (w.loyaltyBonusPct || 0) / 100);
   }
   u.putt = Math.round(total);
   return u.putt;
@@ -242,7 +275,7 @@ function readDiscordLog({ days = 2, guild, kind, user, limit = 500 } = {}) {
 }
 
 module.exports = {
-  touchUser, recordActivity, recordViolation, recordDonation, listUsers, getUser,
-  logActivity, readDiscordLog, keyOf,
+  touchUser, recordActivity, recordViolation, recordDonation, recordSocial, listUsers, getUser,
+  logActivity, readDiscordLog, keyOf, setPuttWeights,
   isWatched, addWatch, removeWatch, listWatch,
 };

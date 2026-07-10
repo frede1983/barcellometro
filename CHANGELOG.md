@@ -4,6 +4,21 @@ Tutte le modifiche rilevanti del progetto sono documentate in questo file.
 Formato basato su [Keep a Changelog](https://keepachangelog.com/it/1.1.0/),
 versionamento [SemVer](https://semver.org/lang/it/).
 
+## [1.3.0] - 2026-07-11
+
+🚧 Work in Progress. Completata la roadmap principale.
+
+### Aggiunto
+- **📈 Storico barcelli con replay**: campionamento continuo dello score (globale e per sorgente), persistito su JSONL, con endpoint per il replay della timeline
+- **🎬 Clip automatiche dei picchi**: al superamento soglia il sistema cattura una clip-highlight (chat + trascrizioni + score del momento), consultabile e scaricabile dalla tab Clip
+- **🔔 Notifiche esterne Telegram e Home Assistant**: avvisi su barcello, moderazione e cross-host; TTS via HA (tts.speak) o persistent_notification; test dalla UI
+- **🌍 Multi-lingua**: dizionari barcello in italiano, inglese e spagnolo con lingue di rilevamento selezionabili; lingua di trascrizione audio (Whisper) configurabile
+- **👑 Punti putt configurabili**: sezione dedicata per assegnare il punteggio a ogni azione (donazione, condivisione, follow, taptap/like, chat, vocale, presenza) + bonus fedeltà; ricalcolo immediato della classifica
+- **Eventi social TikTok**: condivisioni, follow e like (taptap) alimentano i punti putt
+
+### Note
+- Rilevamento barcello nei match TikTok (linkMicBattle) già introdotto in v1.2 con aggancio avversario e flag ping-pong
+
 ## [1.2.0] - 2026-07-11
 
 🚧 Work in Progress.

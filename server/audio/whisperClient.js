@@ -57,12 +57,12 @@ class WhisperClient {
   }
 
   /** Trascrive un WAV. Ritorna stringa (vuota se niente parlato o servizio giu'). */
-  async transcribe(wavBuffer) {
+  async transcribe(wavBuffer, lang = 'it') {
     if (!this.available) return '';
     if (this._busy > 2) return ''; // backpressure: salta chunk se whisper e' indietro
     this._busy++;
     try {
-      const res = await fetch(`${this.baseUrl}/transcribe?lang=it`, {
+      const res = await fetch(`${this.baseUrl}/transcribe?lang=${encodeURIComponent(lang)}`, {
         method: 'POST',
         headers: { 'content-type': 'application/octet-stream' },
         body: wavBuffer,

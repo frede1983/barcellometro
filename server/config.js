@@ -25,6 +25,22 @@ const DEFAULTS = {
   AUDIO_CHUNK_SEC: 8,
   WHISPER_MODEL: 'small',
   WHISPER_URL: 'http://127.0.0.1:3901',
+  // Lingue rilevamento keyword (csv: it,en,es) e lingua trascrizione audio
+  DETECT_LANGS: 'it,en,es',
+  AUDIO_LANG: 'it',
+  UI_LANG: 'it',
+  // Notifiche esterne
+  TELEGRAM_BOT_TOKEN: '',
+  TELEGRAM_CHAT_ID: '',
+  HA_URL: '',
+  HA_TOKEN: '',
+  HA_MEDIA_PLAYER: '',
+  HA_TTS_ENTITY: '',
+  NOTIFY_ON_ALERT: true,
+  NOTIFY_ON_MODERATION: false,
+  NOTIFY_ON_CROSSHOST: true,
+  // Clip automatiche di picco
+  CLIPS_ENABLED: true,
   // Rilevatori AI personalizzati: [{id, name, prompt, enabled}]
   WATCHERS: [],
   WATCHER_INTERVAL_SEC: 60,
@@ -33,6 +49,17 @@ const DEFAULTS = {
   INTERVENTIONS: [],
   INTERVENTION_COOLDOWN_SEC: 300,
   TTS_VOICE: 'it-IT-DiegoNeural',
+  // Pesi punti PUTT (fedeltà community): punti assegnati per azione
+  PUTT_WEIGHTS: {
+    donation: 1.0,   // per diamante donato
+    share: 15,       // per condivisione della live
+    follow: 25,      // per nuovo follow
+    like: 0.02,      // per like/taptap (numeri alti: peso basso)
+    chat: 0.3,       // per messaggio in chat
+    audio: 0.8,      // per intervento vocale
+    visit: 8,        // per presenza/ritorno all'host
+    loyaltyBonusPct: 15, // % bonus se fedele a un solo host (>70% punti)
+  },
   // Moderazione AI Discord: regolamento scritto dall'utente, applicato da Claude
   MODERATION: {
     enabled: false,
@@ -50,7 +77,7 @@ const RESTART_KEYS = ['PORT'];
 const SECRET_KEYS = ['DASH_PASSWORD', 'ANTHROPIC_API_KEY', 'DISCORD_BOT_TOKEN', 'TIKTOK_SIGN_API_KEY'];
 const NUMERIC_KEYS = ['PORT', 'AI_TRIGGER_SCORE', 'AI_COOLDOWN_SEC', 'ALERT_THRESHOLD', 'AUDIO_CHUNK_SEC', 'WATCHER_INTERVAL_SEC', 'WATCHER_COOLDOWN_SEC', 'INTERVENTION_COOLDOWN_SEC'];
 const BOOL_KEYS = ['AUDIO_ENABLED'];
-const JSON_KEYS = ['WATCHERS', 'INTERVENTIONS', 'MODERATION'];
+const JSON_KEYS = ['WATCHERS', 'INTERVENTIONS', 'MODERATION', 'PUTT_WEIGHTS'];
 
 /** Sanifica la lista watcher */
 function sanitizeWatchers(list) {
@@ -84,6 +111,18 @@ function sanitizeModeration(m) {
   };
 }
 
+/** Sanifica i pesi putt (numeri >= 0) */
+function sanitizePuttWeights(w) {
+  if (!w || typeof w !== 'object') return undefined;
+  const keys = ['donation', 'share', 'follow', 'like', 'chat', 'audio', 'visit', 'loyaltyBonusPct'];
+  const out = {};
+  for (const k of keys) {
+    const n = Number(w[k]);
+    out[k] = Number.isFinite(n) && n >= 0 ? n : DEFAULTS.PUTT_WEIGHTS[k];
+  }
+  return out;
+}
+
 /** Sanifica la lista interventi bot */
 function sanitizeInterventions(list) {
   if (!Array.isArray(list)) return undefined;
@@ -115,6 +154,7 @@ function coerce(key, val) {
     if (key === 'WATCHERS') return sanitizeWatchers(v);
     if (key === 'INTERVENTIONS') return sanitizeInterventions(v);
     if (key === 'MODERATION') return sanitizeModeration(v);
+    if (key === 'PUTT_WEIGHTS') return sanitizePuttWeights(v);
     return v;
   }
   return String(val);

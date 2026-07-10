@@ -85,15 +85,52 @@ function normalize(text) {
     .trim();
 }
 
-// Pre-compila regex con confini di parola (le frasi restano ricerca substring)
-const COMPILED = KEYWORDS.map(([kw, w]) => {
-  const isPhrase = kw.includes(' ');
-  const escaped = kw.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = isPhrase
-    ? new RegExp(escaped, 'g')
-    : new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, 'g');
-  return { kw: kw.trim(), w, re };
-});
+// --- Dizionari aggiuntivi: inglese e spagnolo ---
+const KEYWORDS_EN = [
+  ['fuck you', 9], ['fuck off', 8], ['motherfucker', 10], ['son of a bitch', 10],
+  ['piece of shit', 10], ['asshole', 8], ['bastard', 8], ['bitch', 7], ['dickhead', 8],
+  ['shut up', 6], ['shut the fuck up', 9], ['stfu', 7], ['you suck', 7], ['loser', 6],
+  ['pathetic', 6], ['clown', 5], ['idiot', 5], ['moron', 6], ['stupid', 4], ['dumbass', 7],
+  ['i will kill you', 10], ['i will end you', 8], ['come at me', 6], ['fight me', 6],
+  ['snitch', 7], ['liar', 6], ['fake', 4], ['scammer', 6], ['coward', 6], ['trash', 4],
+  ['ratio', 4], ['cope', 4], ['cry about it', 6], ['you mad', 5], ['beef', 4],
+  ['drama', 4], ['fight', 4], ['they are fighting', 7], ['dissing', 5], ['diss', 4],
+];
+const KEYWORDS_ES = [
+  ['vete a la mierda', 9], ['hijo de puta', 10], ['hijos de puta', 10], ['pedazo de mierda', 10],
+  ['cabron', 8], ['cabrona', 8], ['gilipollas', 8], ['pendejo', 8], ['pendeja', 8],
+  ['puta', 8], ['perra', 7], ['imbecil', 6], ['idiota', 5], ['estupido', 4], ['estupida', 4],
+  ['callate', 6], ['calla la boca', 7], ['payaso', 6], ['patetico', 6], ['fracasado', 6],
+  ['te voy a matar', 10], ['te reviento', 9], ['nos vemos fuera', 8], ['cobarde', 6],
+  ['mentiroso', 6], ['mentirosa', 6], ['rata', 6], ['basura', 5], ['ridiculo', 5],
+  ['pelea', 6], ['se estan peleando', 7], ['drama', 4], ['tiradera', 5], ['bardo', 6],
+];
+
+function buildCompiled(list) {
+  return list.map(([kw, w]) => {
+    const isPhrase = kw.includes(' ');
+    const escaped = kw.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = isPhrase
+      ? new RegExp(escaped, 'g')
+      : new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, 'g');
+    return { kw: kw.trim(), w, re };
+  });
+}
+
+const DICTS = {
+  it: buildCompiled(KEYWORDS),
+  en: buildCompiled(KEYWORDS_EN),
+  es: buildCompiled(KEYWORDS_ES),
+};
+
+// Lingue attive per il rilevamento keyword (default: tutte)
+let activeLangs = ['it', 'en', 'es'];
+function setLangs(langs) {
+  if (Array.isArray(langs) && langs.length) {
+    activeLangs = langs.filter(l => DICTS[l]);
+    if (!activeLangs.length) activeLangs = ['it'];
+  }
+}
 
 /**
  * Analizza un testo, ritorna { points, matches: [{kw, w}] }
@@ -103,12 +140,17 @@ function scoreText(text) {
   const norm = normalize(text);
   if (!norm) return { points: 0, matches: [] };
   const matches = [];
+  const seen = new Set();
   let points = 0;
-  for (const { kw, w, re } of COMPILED) {
-    re.lastIndex = 0;
-    if (re.test(norm)) {
-      matches.push({ kw, w });
-      points += w;
+  for (const lang of activeLangs) {
+    for (const { kw, w, re } of DICTS[lang]) {
+      if (seen.has(kw)) continue;
+      re.lastIndex = 0;
+      if (re.test(norm)) {
+        seen.add(kw);
+        matches.push({ kw, w });
+        points += w;
+      }
     }
   }
   for (const [emoji, w] of EMOJI) {
@@ -120,4 +162,4 @@ function scoreText(text) {
   return { points, matches };
 }
 
-module.exports = { scoreText, normalize };
+module.exports = { scoreText, normalize, setLangs };

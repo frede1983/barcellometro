@@ -262,7 +262,7 @@ class DiscordSource {
 
       const whisper = this.cfg.whisper;
       if (!whisper || !whisper.available) return;
-      const text = await whisper.transcribe(pcm16ToWav(pcm16k, 16000, 1));
+      const text = await whisper.transcribe(pcm16ToWav(pcm16k, 16000, 1), this.cfg.audioLang || 'it');
       if (!text) return;
       let name = userId, avatar = null;
       try {
